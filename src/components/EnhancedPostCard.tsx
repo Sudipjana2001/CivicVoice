@@ -77,6 +77,7 @@ interface EnhancedPostCardProps {
 }
 
 export function EnhancedPostCard({ post, onCommentsClick, isCommentsOpen, onPostDeleted }: EnhancedPostCardProps) {
+  const CONTENT_PREVIEW_LIMIT = 280;
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const isMobile = useIsMobile();
@@ -88,6 +89,7 @@ export function EnhancedPostCard({ post, onCommentsClick, isCommentsOpen, onPost
   const [isVoting, setIsVoting] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [editContent, setEditContent] = useState(post.content);
+  const [isContentExpanded, setIsContentExpanded] = useState(false);
   const [isSubmittingEdit, setIsSubmittingEdit] = useState(false);
 
   const session = getAnonymousSession();
@@ -197,6 +199,10 @@ export function EnhancedPostCard({ post, onCommentsClick, isCommentsOpen, onPost
   const confidenceScore = post.confidenceScore || 'medium';
   const visibilityTags = post.visibilityTags || [];
   const credibilityBadge = post.credibilityBadge || { level: 'new', reportsCount: 1, credibilityScore: 75 };
+  const isLongContent = post.content.length > CONTENT_PREVIEW_LIMIT;
+  const displayContent = isContentExpanded || !isLongContent
+    ? post.content
+    : `${post.content.slice(0, CONTENT_PREVIEW_LIMIT).trimEnd()}...`;
 
   return (
     <Card className="glass-card overflow-hidden animate-fade-in hover:border-border transition-colors">
@@ -264,9 +270,21 @@ export function EnhancedPostCard({ post, onCommentsClick, isCommentsOpen, onPost
               </div>
             </div>
           ) : (
-            <p className="text-foreground/90 text-sm leading-relaxed mb-3">
-              {post.content}
-            </p>
+            <div className="mb-3">
+              <p className="text-foreground/90 text-sm leading-relaxed">
+                {displayContent}
+              </p>
+              {isLongContent && (
+                <Button
+                  variant="link"
+                  size="sm"
+                  className="h-auto p-0 mt-1 text-primary"
+                  onClick={() => setIsContentExpanded((prev) => !prev)}
+                >
+                  {isContentExpanded ? 'Show less' : 'Show more'}
+                </Button>
+              )}
+            </div>
           )}
 
           {/* Legal disclaimer */}

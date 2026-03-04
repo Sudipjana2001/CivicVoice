@@ -347,6 +347,10 @@ export function GuidedReportDialog({ onPostCreated }: GuidedReportDialogProps) {
                     onChange={async (e) => {
                       const file = e.target.files?.[0];
                       if (!file) return;
+                      if (!user) {
+                        toast.error('Please sign in before uploading evidence');
+                        return;
+                      }
 
                       // Size check (10MB max)
                       if (file.size > 10 * 1024 * 1024) {
@@ -368,12 +372,12 @@ export function GuidedReportDialog({ onPostCreated }: GuidedReportDialogProps) {
                           .from('evidence')
                           .upload(fileName, uploadFile, {
                             cacheControl: '3600',
+                            contentType: file.type || undefined,
                             upsert: false,
                           });
 
                         if (error) {
-                          // If bucket doesn't exist, fall back to URL input
-                          toast.error('Upload failed. You can paste a URL instead.');
+                          toast.error(`Upload failed: ${error.message}`);
                           console.error('Upload error:', error);
                           return;
                         }
@@ -386,7 +390,8 @@ export function GuidedReportDialog({ onPostCreated }: GuidedReportDialogProps) {
                         toast.success('File uploaded successfully');
                       } catch (err) {
                         console.error('Upload error:', err);
-                        toast.error('Upload failed. You can paste a URL instead.');
+                        const message = err instanceof Error ? err.message : 'Unknown error';
+                        toast.error(`Upload failed: ${message}`);
                       }
                     }}
                   />
