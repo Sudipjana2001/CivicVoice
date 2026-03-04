@@ -1,5 +1,5 @@
 import { useState, useMemo, useRef, useEffect, useCallback } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useInfiniteQuery, useQueryClient } from '@tanstack/react-query';
 import { Header } from '@/components/Header';
 import { FilterButton } from '@/components/FilterButton';
 import { EnhancedPostCard } from '@/components/EnhancedPostCard';
@@ -21,15 +21,26 @@ import { Link } from 'react-router-dom';
 type SortOption = 'recent' | 'trending';
 
 const postService = PostService.getInstance();
+const POSTS_PAGE_SIZE = 10;
 
 export default function Index() {
   const isMobile = useIsMobile();
   const queryClient = useQueryClient();
   const { user } = useAuth();
 
-  const { data: posts = [], isLoading, error } = useQuery({
+  const {
+    data,
+    isLoading,
+    error,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  } = useInfiniteQuery({
     queryKey: ['posts'],
-    queryFn: () => postService.fetchAll(),
+    queryFn: ({ pageParam = 0 }) => postService.fetchPage(POSTS_PAGE_SIZE, pageParam),
+    getNextPageParam: (lastPage, allPages) =>
+      lastPage.hasMore ? allPages.length * POSTS_PAGE_SIZE : undefined,
+    initialPageParam: 0,
   });
 
   const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
@@ -37,6 +48,8 @@ export default function Index() {
   const [sortBy, setSortBy] = useState<SortOption>('recent');
   const [followedTopics, setFollowedTopics] = useState<FollowedTopic[]>([]);
   const [selectedPostId, setSelectedPostId] = useState<string | null>(null);
+  const loadMoreRef = useRef<HTMLDivElement | null>(null);
+  const posts = useMemo(() => data?.pages.flatMap((page) => page.posts) ?? [], [data]);
 
   // Real-time subscription for new posts
   useEffect(() => {
@@ -51,6 +64,21 @@ export default function Index() {
       supabase.removeChannel(channel);
     };
   }, [queryClient]);
+
+  useEffect(() => {
+    if (!loadMoreRef.current) return;
+    const node = loadMoreRef.current;
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting && hasNextPage && !isFetchingNextPage) {
+          fetchNextPage();
+        }
+      },
+      { rootMargin: '300px 0px' }
+    );
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [fetchNextPage, hasNextPage, isFetchingNextPage]);
 
   const filteredPosts = useMemo(() => {
     let result = [...posts];
@@ -246,20 +274,36 @@ export default function Index() {
               <p className="text-destructive">Failed to load reports. Please try again.</p>
             </div>
           ) : filteredPosts.length > 0 ? (
-            filteredPosts.map((post, idx) => (
-              <div
-                key={post.id}
-                className="cv-stagger-enter"
-                style={{ animationDelay: `${Math.min(idx * 70, 560)}ms` }}
-              >
-                <PostWithComments
-                  post={post}
-                  isCommentsOpen={selectedPostId === post.id && !isMobile}
-                  onCommentsClick={handleCommentsClick}
-                  onCloseComments={handleCloseComments}
-                />
-              </div>
-            ))
+            <>
+              {filteredPosts.map((post, idx) => (
+                <div
+                  key={post.id}
+                  className="cv-stagger-enter"
+                  style={{ animationDelay: `${Math.min(idx * 70, 560)}ms` }}
+                >
+                  <PostWithComments
+                    post={post}
+                    isCommentsOpen={selectedPostId === post.id && !isMobile}
+                    onCommentsClick={handleCommentsClick}
+                    onCloseComments={handleCloseComments}
+                  />
+                </div>
+              ))}
+
+              <div ref={loadMoreRef} className="h-4" />
+
+              {isFetchingNextPage && (
+                <div className="max-w-2xl mx-auto space-y-3 py-2">
+                  {Array.from({ length: 2 }).map((_, idx) => (
+                    <div key={idx} className="glass-card p-4 space-y-2 cv-stagger-enter" style={{ animationDelay: `${idx * 60}ms` }}>
+                      <div className="h-4 w-3/4 rounded cv-shimmer" />
+                      <div className="h-4 w-full rounded cv-shimmer" />
+                      <div className="h-4 w-2/3 rounded cv-shimmer" />
+                    </div>
+                  ))}
+                </div>
+              )}
+            </>
           ) : (
             <div className="text-center py-12 glass-card max-w-2xl mx-auto">
               <p className="text-muted-foreground">

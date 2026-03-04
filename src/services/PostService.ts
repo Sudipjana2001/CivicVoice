@@ -66,6 +66,23 @@ export class PostService {
     return (data || []).map(this.mapRowToPost);
   }
 
+  /** Fetch a page of posts for infinite scrolling. */
+  async fetchPage(limit: number, offset: number): Promise<{ posts: Post[]; hasMore: boolean }> {
+    const { data, error } = await supabase
+      .from('posts')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .range(offset, offset + limit - 1);
+
+    if (error) throw error;
+
+    const posts = (data || []).map(this.mapRowToPost);
+    return {
+      posts,
+      hasMore: posts.length === limit,
+    };
+  }
+
   /** Fetch a single post by ID. */
   async fetchById(id: string): Promise<Post | null> {
     const { data, error } = await supabase
