@@ -49,6 +49,8 @@ export default function Index() {
   const [followedTopics, setFollowedTopics] = useState<FollowedTopic[]>([]);
   const [selectedPostId, setSelectedPostId] = useState<string | null>(null);
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
+  const scrollGateRef = useRef(0);
+  const lastConsumedGateRef = useRef(0);
   const posts = useMemo(() => data?.pages.flatMap((page) => page.posts) ?? [], [data]);
 
   // Real-time subscription for new posts
@@ -66,15 +68,26 @@ export default function Index() {
   }, [queryClient]);
 
   useEffect(() => {
+    const handleScroll = () => {
+      scrollGateRef.current += 1;
+    };
+
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  useEffect(() => {
     if (!loadMoreRef.current) return;
     const node = loadMoreRef.current;
     const observer = new IntersectionObserver(
       ([entry]) => {
-        if (entry.isIntersecting && hasNextPage && !isFetchingNextPage) {
+        const userScrolledSinceLastFetch = scrollGateRef.current > lastConsumedGateRef.current;
+        if (entry.isIntersecting && hasNextPage && !isFetchingNextPage && userScrolledSinceLastFetch) {
+          lastConsumedGateRef.current = scrollGateRef.current;
           fetchNextPage();
         }
       },
-      { rootMargin: '300px 0px' }
+      { rootMargin: '120px 0px' }
     );
     observer.observe(node);
     return () => observer.disconnect();
