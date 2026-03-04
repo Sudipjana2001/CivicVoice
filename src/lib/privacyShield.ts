@@ -103,12 +103,12 @@ export function applyPrivacyHeaders(): void {
   
   // Content Security Policy — block external tracking
   const csp = [
-    "default-src 'self'",
-    "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
-    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+    "default-src 'self' https://*.supabase.co wss://*.supabase.co",
+    "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://*.vercel-insights.com",
+    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://unpkg.com",
     "font-src 'self' https://fonts.gstatic.com",
-    "img-src 'self' data: blob: https://*.supabase.co https://*.basemaps.cartocdn.com https://*.tile.openstreetmap.org",
-    "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://nominatim.openstreetmap.org",
+    "img-src 'self' data: blob: https://*.supabase.co https://*.basemaps.cartocdn.com https://*.tile.openstreetmap.org https://unpkg.com",
+    "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://nominatim.openstreetmap.org https://*.vercel-insights.com",
     "frame-src 'none'",
     "object-src 'none'",
     "base-uri 'self'",
