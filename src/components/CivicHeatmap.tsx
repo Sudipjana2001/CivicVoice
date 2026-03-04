@@ -296,6 +296,16 @@ export function CivicHeatmap({ className }: CivicHeatmapProps) {
               ))}
             </MapContainer>
 
+            {loading && (
+              <div className="absolute inset-0 z-[1200] bg-background/65 backdrop-blur-[1px] p-4 sm:p-6 flex items-end pointer-events-none">
+                <div className="w-full space-y-3">
+                  <div className="h-8 w-40 rounded cv-shimmer" />
+                  <div className="h-4 w-2/3 rounded cv-shimmer" />
+                  <div className="h-4 w-1/2 rounded cv-shimmer" />
+                </div>
+              </div>
+            )}
+
             {/* Legend */}
             <div className="absolute bottom-3 right-3 z-[1000] flex items-center gap-2 px-3 py-2 bg-card/90 backdrop-blur-sm rounded-lg shadow-md border border-border/50">
               <div className="flex items-center gap-1">
@@ -330,7 +340,7 @@ export function CivicHeatmap({ className }: CivicHeatmapProps) {
 
           {/* Selected location details */}
           {selectedLocation && (
-            <div className="p-4 border-t border-border/50 bg-muted/10 animate-fade-in">
+            <div className="p-4 border-t border-border/50 bg-muted/10 cv-content-fade">
               <div className="flex items-start justify-between mb-3">
                 <div>
                   <h4 className="font-medium flex items-center gap-2">

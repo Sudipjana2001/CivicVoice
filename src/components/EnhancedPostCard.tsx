@@ -94,6 +94,7 @@ export function EnhancedPostCard({ post, onCommentsClick, isCommentsOpen, onPost
   const [isContentExpanded, setIsContentExpanded] = useState(false);
   const [isSubmittingEdit, setIsSubmittingEdit] = useState(false);
   const [isEvidenceViewerOpen, setIsEvidenceViewerOpen] = useState(false);
+  const [votePulse, setVotePulse] = useState<'credible' | 'suspicious' | null>(null);
 
   const session = getAnonymousSession();
   // Ownership is server-backed through posts.user_id
@@ -138,6 +139,8 @@ export function EnhancedPostCard({ post, onCommentsClick, isCommentsOpen, onPost
 
     if (isVoting) return;
     setIsVoting(true);
+    setVotePulse(type);
+    window.setTimeout(() => setVotePulse((prev) => (prev === type ? null : prev)), 240);
 
     try {
       const result = await voteService.toggleVote(
@@ -239,7 +242,7 @@ export function EnhancedPostCard({ post, onCommentsClick, isCommentsOpen, onPost
               Faces auto-blurred
             </div>
             <div className="absolute bottom-2 right-2">
-              <Button size="sm" variant="secondary" className="gap-1 h-8" onClick={() => setIsEvidenceViewerOpen(true)}>
+              <Button size="sm" variant="secondary" className="gap-1 h-8 cv-interactive" onClick={() => setIsEvidenceViewerOpen(true)}>
                 <ExternalLink className="h-3.5 w-3.5" />
                 View Evidence
               </Button>
@@ -297,7 +300,10 @@ export function EnhancedPostCard({ post, onCommentsClick, isCommentsOpen, onPost
             </div>
           ) : (
             <div className="mb-3">
-              <p className="text-foreground/90 text-sm leading-relaxed">
+              <p
+                key={isContentExpanded ? 'expanded' : 'collapsed'}
+                className="text-foreground/90 text-sm leading-relaxed cv-content-fade"
+              >
                 {displayContent}
               </p>
               {isLongContent && (
@@ -352,7 +358,7 @@ export function EnhancedPostCard({ post, onCommentsClick, isCommentsOpen, onPost
                 size="sm"
                 onClick={() => handleVote('credible')}
                 disabled={isVoting}
-                className={`px-2 sm:px-3 ${userVote === 'credible' ? 'credibility-positive' : 'text-muted-foreground hover:text-credible'}`}
+                className={`px-2 sm:px-3 cv-interactive ${userVote === 'credible' ? 'credibility-positive' : 'text-muted-foreground hover:text-credible'} ${votePulse === 'credible' ? 'cv-tap-pop' : ''}`}
               >
                 <ThumbsUp className="h-4 w-4" />
                 <span className="text-xs ml-1 hidden sm:inline">Credible ({credibleVotes})</span>
@@ -363,7 +369,7 @@ export function EnhancedPostCard({ post, onCommentsClick, isCommentsOpen, onPost
                 size="sm"
                 onClick={() => handleVote('suspicious')}
                 disabled={isVoting}
-                className={`px-2 sm:px-3 ${userVote === 'suspicious' ? 'credibility-negative' : 'text-muted-foreground hover:text-suspicious'}`}
+                className={`px-2 sm:px-3 cv-interactive ${userVote === 'suspicious' ? 'credibility-negative' : 'text-muted-foreground hover:text-suspicious'} ${votePulse === 'suspicious' ? 'cv-tap-pop' : ''}`}
               >
                 <ThumbsDown className="h-4 w-4" />
                 <span className="text-xs ml-1 hidden sm:inline">Suspicious ({suspiciousVotes})</span>
@@ -375,7 +381,7 @@ export function EnhancedPostCard({ post, onCommentsClick, isCommentsOpen, onPost
               <Button 
                 variant="ghost" 
                 size="sm" 
-                className={`px-2 sm:px-3 ${isCommentsOpen ? 'text-primary bg-primary/10' : 'text-muted-foreground hover:text-foreground'}`}
+                className={`px-2 sm:px-3 cv-interactive ${isCommentsOpen ? 'text-primary bg-primary/10' : 'text-muted-foreground hover:text-foreground'}`}
                 onClick={handleCommentsClick}
               >
                 <MessageCircle className="h-4 w-4" />
@@ -384,7 +390,7 @@ export function EnhancedPostCard({ post, onCommentsClick, isCommentsOpen, onPost
               <Button 
                 variant="ghost" 
                 size="sm" 
-                className="px-2 sm:px-3 text-muted-foreground hover:text-foreground"
+                className="px-2 sm:px-3 text-muted-foreground hover:text-foreground cv-interactive"
                 onClick={async () => {
                   const shareUrl = `${window.location.origin}/comments/${post.id}`;
                   const shareText = `${post.content.substring(0, 100)}${post.content.length > 100 ? '...' : ''}`;
@@ -411,7 +417,7 @@ export function EnhancedPostCard({ post, onCommentsClick, isCommentsOpen, onPost
               {isOwner ? (
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="sm" className="px-2 sm:px-3 text-muted-foreground hover:text-foreground">
+                   <Button variant="ghost" size="sm" className="px-2 sm:px-3 text-muted-foreground hover:text-foreground cv-interactive">
                       <MoreVertical className="h-4 w-4" />
                     </Button>
                   </DropdownMenuTrigger>
@@ -430,7 +436,7 @@ export function EnhancedPostCard({ post, onCommentsClick, isCommentsOpen, onPost
                 <ReportPostButton
                   postId={post.id}
                   initialCount={post.reportCount}
-                  className="px-2 sm:px-3 text-muted-foreground hover:text-destructive"
+                  className="px-2 sm:px-3 text-muted-foreground hover:text-destructive cv-interactive"
                 />
               )}
             </div>
@@ -445,18 +451,18 @@ export function EnhancedPostCard({ post, onCommentsClick, isCommentsOpen, onPost
         </DialogHeader>
         <div className="w-full max-h-[75vh] overflow-auto">
           {post.evidenceType === 'photo' && evidenceHref && (
-            <img src={evidenceHref} alt="Evidence full view" className="w-full h-auto rounded-md" />
+            <img src={evidenceHref} alt="Evidence full view" className="w-full h-auto rounded-md cv-media-enter" />
           )}
           {post.evidenceType === 'video' && evidenceHref && (
-            <video controls className="w-full rounded-md" src={evidenceHref}>
+            <video controls className="w-full rounded-md cv-media-enter" src={evidenceHref}>
               Your browser cannot play this video.
             </video>
           )}
           {post.evidenceType === 'document' && evidenceHref && (
-            <iframe title="Evidence document" src={evidenceHref} className="w-full h-[70vh] rounded-md border" />
+            <iframe title="Evidence document" src={evidenceHref} className="w-full h-[70vh] rounded-md border cv-media-enter" />
           )}
           {post.evidenceType && post.evidenceType !== 'photo' && post.evidenceType !== 'video' && post.evidenceType !== 'document' && evidenceHref && (
-            <iframe title="Evidence content" src={evidenceHref} className="w-full h-[70vh] rounded-md border" />
+            <iframe title="Evidence content" src={evidenceHref} className="w-full h-[70vh] rounded-md border cv-media-enter" />
           )}
         </div>
       </DialogContent>

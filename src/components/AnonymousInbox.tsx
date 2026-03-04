@@ -11,7 +11,6 @@ import {
   AlertTriangle,
   Trash2,
   Reply,
-  Loader2,
   LogIn,
   ArrowLeft
 } from 'lucide-react';
@@ -183,16 +182,17 @@ export function AnonymousInbox({ className }: AnonymousInboxProps) {
   // Render message list
   const renderMessageList = () => (
     <div className="divide-y divide-border/50">
-      {messages.map((message) => {
+      {messages.map((message, idx) => {
         const config = senderConfig[message.senderType];
         const MsgIcon = config.icon;
         return (
           <button
             key={message.id}
             onClick={() => handleSelectMessage(message)}
-            className={`w-full p-3 text-left hover:bg-muted/50 transition-colors ${
+            className={`w-full p-3 text-left hover:bg-muted/50 transition-colors cv-interactive cv-stagger-enter ${
               selectedMessage?.id === message.id ? 'bg-muted/50' : ''
             } ${!message.read ? 'bg-primary/5' : ''}`}
+            style={{ animationDelay: `${Math.min(idx * 45, 360)}ms` }}
           >
             <div className="flex items-start gap-2">
               <div className={`w-6 h-6 rounded-full ${config.bgColor} flex items-center justify-center flex-shrink-0`}>
@@ -243,9 +243,14 @@ export function AnonymousInbox({ className }: AnonymousInboxProps) {
           {isMobile ? (
             <div className="h-[400px]">
               {loading ? (
-                <div className="p-8 text-center text-muted-foreground">
-                  <Loader2 className="h-8 w-8 mx-auto mb-2 animate-spin" />
-                  <p className="text-sm">Loading messages...</p>
+                <div className="p-4 space-y-3">
+                  {Array.from({ length: 4 }).map((_, idx) => (
+                    <div key={idx} className="p-3 rounded-lg border border-border/50 bg-muted/20 space-y-2 cv-stagger-enter" style={{ animationDelay: `${idx * 40}ms` }}>
+                      <div className="h-3 w-24 rounded cv-shimmer" />
+                      <div className="h-4 w-2/3 rounded cv-shimmer" />
+                      <div className="h-3 w-full rounded cv-shimmer" />
+                    </div>
+                  ))}
                 </div>
               ) : messages.length === 0 ? (
                 <div className="p-8 text-center text-muted-foreground">
@@ -265,9 +270,14 @@ export function AnonymousInbox({ className }: AnonymousInboxProps) {
             <div className="flex h-[400px]">
               <ScrollArea className="w-2/5 border-r border-border/50">
                 {loading ? (
-                  <div className="p-8 text-center text-muted-foreground">
-                    <Loader2 className="h-8 w-8 mx-auto mb-2 animate-spin" />
-                    <p className="text-sm">Loading messages...</p>
+                  <div className="p-4 space-y-3">
+                    {Array.from({ length: 5 }).map((_, idx) => (
+                      <div key={idx} className="p-3 rounded-lg border border-border/50 bg-muted/20 space-y-2 cv-stagger-enter" style={{ animationDelay: `${idx * 35}ms` }}>
+                        <div className="h-3 w-24 rounded cv-shimmer" />
+                        <div className="h-4 w-3/4 rounded cv-shimmer" />
+                        <div className="h-3 w-full rounded cv-shimmer" />
+                      </div>
+                    ))}
                   </div>
                 ) : messages.length === 0 ? (
                   <div className="p-8 text-center text-muted-foreground">

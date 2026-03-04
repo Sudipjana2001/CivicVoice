@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Send, Clock, LogIn, Loader2 } from 'lucide-react';
+import { Send, Clock, LogIn } from 'lucide-react';
 import { CommentService } from '@/services/CommentService';
 import type { CommentRow } from '@/services/CommentService';
 import { useAuth } from '@/hooks/useAuth';
@@ -89,7 +89,7 @@ export function CommentsSection({ postId, initialCount, isFullPage }: CommentsSe
               size="icon"
               onClick={handleSubmit}
               disabled={!newComment.trim() || isSubmitting}
-              className="flex-shrink-0"
+              className="flex-shrink-0 cv-interactive"
             >
               <Send className="h-4 w-4" />
             </Button>
@@ -114,16 +114,22 @@ export function CommentsSection({ postId, initialCount, isFullPage }: CommentsSe
       <ScrollArea className={isFullPage ? 'h-auto' : 'flex-1'}>
         <div className="p-3 space-y-3">
           {isLoading ? (
-            <div className="text-center py-8">
-              <Loader2 className="h-5 w-5 animate-spin mx-auto text-muted-foreground" />
+            <div className="space-y-3 py-2">
+              {Array.from({ length: 3 }).map((_, idx) => (
+                <div key={idx} className="p-3 rounded-lg bg-muted/30 border border-border/50 space-y-2 cv-stagger-enter" style={{ animationDelay: `${idx * 50}ms` }}>
+                  <div className="h-3 w-32 rounded cv-shimmer" />
+                  <div className="h-3 w-full rounded cv-shimmer" />
+                  <div className="h-3 w-3/4 rounded cv-shimmer" />
+                </div>
+              ))}
             </div>
           ) : comments.length === 0 ? (
             <p className="text-center text-sm text-muted-foreground py-4">
               No comments yet. Be the first to comment!
             </p>
           ) : (
-            comments.map((comment) => (
-              <div key={comment.id} className="p-3 rounded-lg bg-muted/30 border border-border/50">
+            comments.map((comment, idx) => (
+              <div key={comment.id} className="p-3 rounded-lg bg-muted/30 border border-border/50 cv-stagger-enter" style={{ animationDelay: `${Math.min(idx * 35, 350)}ms` }}>
                 <div className="flex items-center gap-2 mb-1">
                   <span className="text-xs font-medium anonymous-id">{comment.anonymous_id}</span>
                   <span className="text-xs text-muted-foreground flex items-center gap-1">

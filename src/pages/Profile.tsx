@@ -27,7 +27,6 @@ import {
   MessageSquare,
   AlertTriangle,
   CheckCircle2,
-  Loader2
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { EnhancedPostCard } from '@/components/EnhancedPostCard';
@@ -259,8 +258,24 @@ export default function Profile() {
 
   if (authLoading || loading) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      <div className="min-h-screen bg-background">
+        <Header />
+        <main className="container mx-auto px-4 py-6 sm:py-8 max-w-4xl space-y-6">
+          <div className="glass-card p-5 sm:p-6 space-y-4">
+            <div className="h-8 w-44 rounded cv-shimmer" />
+            <div className="h-4 w-60 rounded cv-shimmer" />
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-1">
+              {Array.from({ length: 4 }).map((_, idx) => (
+                <div key={idx} className="h-10 rounded cv-shimmer cv-stagger-enter" style={{ animationDelay: `${idx * 40}ms` }} />
+              ))}
+            </div>
+          </div>
+          <div className="glass-card p-5 sm:p-6 space-y-3">
+            {Array.from({ length: 6 }).map((_, idx) => (
+              <div key={idx} className="h-4 rounded cv-shimmer cv-stagger-enter" style={{ animationDelay: `${idx * 35}ms` }} />
+            ))}
+          </div>
+        </main>
       </div>
     );
   }
@@ -296,7 +311,7 @@ export default function Profile() {
                   </CardDescription>
                 </div>
               </div>
-              <Button variant="outline" size="sm" onClick={handleSignOut}>Sign Out</Button>
+              <Button variant="outline" size="sm" onClick={handleSignOut} className="cv-interactive">Sign Out</Button>
             </div>
           </CardHeader>
         </Card>
@@ -315,15 +330,16 @@ export default function Profile() {
           <TabsContent value="posts" className="space-y-4">
             <div className="flex flex-col gap-4">
               {userPosts.length > 0 ? (
-                userPosts.map((post) => (
-                  <EnhancedPostCard 
-                    key={post.id} 
-                    post={post} 
-                    onPostDeleted={() => {
-                      // refresh posts after deletion
-                      PostService.getInstance().fetchByUserId(user.id).then(setUserPosts);
-                    }}
-                  />
+                userPosts.map((post, idx) => (
+                  <div key={post.id} className="cv-stagger-enter" style={{ animationDelay: `${Math.min(idx * 45, 360)}ms` }}>
+                    <EnhancedPostCard 
+                      post={post} 
+                      onPostDeleted={() => {
+                        // refresh posts after deletion
+                        PostService.getInstance().fetchByUserId(user.id).then(setUserPosts);
+                      }}
+                    />
+                  </div>
                 ))
               ) : (
                 <Card className="border-border/50 bg-muted/20">
@@ -633,8 +649,8 @@ export default function Profile() {
                 ) : (
                   <ScrollArea className="h-[400px]">
                     <div className="space-y-4">
-                      {activities.map((activity) => (
-                        <div key={activity.id} className="flex items-start gap-3 p-3 rounded-lg bg-muted/30">
+                      {activities.map((activity, idx) => (
+                        <div key={activity.id} className="flex items-start gap-3 p-3 rounded-lg bg-muted/30 cv-stagger-enter" style={{ animationDelay: `${Math.min(idx * 25, 260)}ms` }}>
                           <div className="mt-0.5">
                             {getActivityIcon(activity.activity_type)}
                           </div>

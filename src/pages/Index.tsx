@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef, useEffect } from 'react';
+import { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Header } from '@/components/Header';
 import { FilterButton } from '@/components/FilterButton';
@@ -13,7 +13,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import type { Post, Category, Severity } from '@/lib/anonymity';
 import type { FollowedTopic } from '@/lib/types';
-import { TrendingUp, Clock, Loader2, LogIn } from 'lucide-react';
+import { TrendingUp, Clock, LogIn } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { Link } from 'react-router-dom';
@@ -113,15 +113,40 @@ export default function Index() {
     const postRef = useRef<HTMLDivElement>(null);
     const [postHeight, setPostHeight] = useState<number | undefined>(undefined);
 
+    const syncPostHeight = useCallback(() => {
+      if (!postRef.current) return;
+      const nextHeight = Math.ceil(postRef.current.getBoundingClientRect().height);
+      setPostHeight((prev) => (prev === nextHeight ? prev : nextHeight));
+    }, []);
+
     useEffect(() => {
-      if (isCommentsOpen && postRef.current) {
-        setPostHeight(postRef.current.offsetHeight);
+      if (!isCommentsOpen) {
+        setPostHeight(undefined);
+        return;
       }
-    }, [isCommentsOpen]);
+
+      syncPostHeight();
+
+      let resizeObserver: ResizeObserver | null = null;
+      if (typeof ResizeObserver !== 'undefined' && postRef.current) {
+        resizeObserver = new ResizeObserver(() => {
+          syncPostHeight();
+        });
+        resizeObserver.observe(postRef.current);
+      }
+
+      const handleWindowResize = () => syncPostHeight();
+      window.addEventListener('resize', handleWindowResize);
+
+      return () => {
+        window.removeEventListener('resize', handleWindowResize);
+        resizeObserver?.disconnect();
+      };
+    }, [isCommentsOpen, syncPostHeight]);
 
     return (
-      <div className={`grid gap-4 ${isCommentsOpen ? 'grid-cols-2' : 'grid-cols-1 max-w-2xl mx-auto'}`}>
-        <div ref={postRef}>
+      <div className={`grid items-start gap-4 ${isCommentsOpen ? 'grid-cols-2' : 'grid-cols-1 max-w-2xl mx-auto'}`}>
+        <div ref={postRef} className="self-start">
           <EnhancedPostCard 
             post={post} 
             onCommentsClick={onCommentsClick}
@@ -195,23 +220,45 @@ export default function Index() {
         {/* Posts */}
         <div className="max-w-4xl mx-auto space-y-4">
           {isLoading ? (
-            <div className="text-center py-12 glass-card max-w-2xl mx-auto">
-              <Loader2 className="h-8 w-8 animate-spin text-primary mx-auto mb-2" />
-              <p className="text-muted-foreground">Loading reports...</p>
+            <div className="max-w-2xl mx-auto space-y-4">
+              {Array.from({ length: 3 }).map((_, idx) => (
+                <div key={idx} className="glass-card p-4 sm:p-5 space-y-3 cv-stagger-enter" style={{ animationDelay: `${idx * 70}ms` }}>
+                  <div className="h-40 rounded-lg cv-shimmer" />
+                  <div className="flex gap-2">
+                    <div className="h-6 w-20 rounded-full cv-shimmer" />
+                    <div className="h-6 w-24 rounded-full cv-shimmer" />
+                    <div className="h-6 w-20 rounded-full cv-shimmer" />
+                  </div>
+                  <div className="space-y-2">
+                    <div className="h-4 w-full rounded cv-shimmer" />
+                    <div className="h-4 w-[88%] rounded cv-shimmer" />
+                    <div className="h-4 w-[70%] rounded cv-shimmer" />
+                  </div>
+                  <div className="flex items-center justify-between pt-2">
+                    <div className="h-8 w-36 rounded cv-shimmer" />
+                    <div className="h-8 w-24 rounded cv-shimmer" />
+                  </div>
+                </div>
+              ))}
             </div>
           ) : error ? (
             <div className="text-center py-12 glass-card max-w-2xl mx-auto">
               <p className="text-destructive">Failed to load reports. Please try again.</p>
             </div>
           ) : filteredPosts.length > 0 ? (
-            filteredPosts.map((post) => (
-              <PostWithComments
+            filteredPosts.map((post, idx) => (
+              <div
                 key={post.id}
-                post={post}
-                isCommentsOpen={selectedPostId === post.id && !isMobile}
-                onCommentsClick={handleCommentsClick}
-                onCloseComments={handleCloseComments}
-              />
+                className="cv-stagger-enter"
+                style={{ animationDelay: `${Math.min(idx * 70, 560)}ms` }}
+              >
+                <PostWithComments
+                  post={post}
+                  isCommentsOpen={selectedPostId === post.id && !isMobile}
+                  onCommentsClick={handleCommentsClick}
+                  onCloseComments={handleCloseComments}
+                />
+              </div>
             ))
           ) : (
             <div className="text-center py-12 glass-card max-w-2xl mx-auto">

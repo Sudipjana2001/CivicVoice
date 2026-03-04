@@ -1,5 +1,5 @@
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Clock, MapPin, ThumbsUp, ThumbsDown, Share2, Camera, Video, FileText, Users, Loader2, ExternalLink } from 'lucide-react';
+import { ArrowLeft, Clock, MapPin, ThumbsUp, ThumbsDown, Share2, Camera, Video, FileText, Users, ExternalLink } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -48,6 +48,7 @@ export default function CommentsPage() {
   const [userVote, setUserVote] = useState<'credible' | 'suspicious' | null>(null);
   const [isVoting, setIsVoting] = useState(false);
   const [isEvidenceViewerOpen, setIsEvidenceViewerOpen] = useState(false);
+  const [votePulse, setVotePulse] = useState<'credible' | 'suspicious' | null>(null);
 
   useEffect(() => {
     if (post) {
@@ -66,8 +67,20 @@ export default function CommentsPage() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      <div className="min-h-screen bg-background p-4">
+        <div className="max-w-3xl mx-auto space-y-4 pt-16">
+          <div className="glass-card p-4 space-y-3">
+            <div className="h-40 rounded-lg cv-shimmer" />
+            <div className="h-6 w-40 rounded cv-shimmer" />
+            <div className="h-4 w-full rounded cv-shimmer" />
+            <div className="h-4 w-5/6 rounded cv-shimmer" />
+          </div>
+          <div className="glass-card p-4 space-y-2">
+            {Array.from({ length: 3 }).map((_, idx) => (
+              <div key={idx} className="h-4 rounded cv-shimmer cv-stagger-enter" style={{ animationDelay: `${idx * 40}ms` }} />
+            ))}
+          </div>
+        </div>
       </div>
     );
   }
@@ -95,6 +108,8 @@ export default function CommentsPage() {
     }
     if (isVoting) return;
     setIsVoting(true);
+    setVotePulse(type);
+    window.setTimeout(() => setVotePulse((prev) => (prev === type ? null : prev)), 240);
 
     try {
       const result = await voteService.toggleVote(
@@ -137,7 +152,7 @@ export default function CommentsPage() {
                     <img
                       src={evidenceHref}
                       alt="Evidence"
-                      className="w-full h-full object-cover cursor-zoom-in"
+                      className="w-full h-full object-cover cursor-zoom-in cv-media-enter"
                     />
                   </button>
                 ) : (
@@ -220,7 +235,7 @@ export default function CommentsPage() {
                     size="sm"
                     onClick={() => handleVote('credible')}
                     disabled={isVoting}
-                    className={`px-2 h-8 ${userVote === 'credible' ? 'credibility-positive' : 'text-muted-foreground hover:text-credible'}`}
+                    className={`px-2 h-8 cv-interactive ${userVote === 'credible' ? 'credibility-positive' : 'text-muted-foreground hover:text-credible'} ${votePulse === 'credible' ? 'cv-tap-pop' : ''}`}
                   >
                     <ThumbsUp className="h-4 w-4" />
                     <span className="text-xs ml-1">{credibleVotes}</span>
@@ -230,7 +245,7 @@ export default function CommentsPage() {
                     size="sm"
                     onClick={() => handleVote('suspicious')}
                     disabled={isVoting}
-                    className={`px-2 h-8 ${userVote === 'suspicious' ? 'credibility-negative' : 'text-muted-foreground hover:text-suspicious'}`}
+                    className={`px-2 h-8 cv-interactive ${userVote === 'suspicious' ? 'credibility-negative' : 'text-muted-foreground hover:text-suspicious'} ${votePulse === 'suspicious' ? 'cv-tap-pop' : ''}`}
                   >
                     <ThumbsDown className="h-4 w-4" />
                     <span className="text-xs ml-1">{suspiciousVotes}</span>
@@ -238,13 +253,13 @@ export default function CommentsPage() {
                 </div>
 
                 <div className="flex items-center gap-1">
-                  <Button variant="ghost" size="sm" className="px-2 h-8 text-muted-foreground hover:text-foreground">
+                  <Button variant="ghost" size="sm" className="px-2 h-8 text-muted-foreground hover:text-foreground cv-interactive">
                     <Share2 className="h-4 w-4" />
                   </Button>
                   <ReportPostButton
                     postId={post.id}
                     initialCount={post.reportCount}
-                    className="px-2 h-8 text-muted-foreground hover:text-destructive"
+                    className="px-2 h-8 text-muted-foreground hover:text-destructive cv-interactive"
                   />
                 </div>
               </div>
@@ -267,18 +282,18 @@ export default function CommentsPage() {
           </DialogHeader>
           <div className="w-full max-h-[75vh] overflow-auto">
             {post.evidenceType === 'photo' && evidenceHref && (
-              <img src={evidenceHref} alt="Evidence full view" className="w-full h-auto rounded-md" />
+              <img src={evidenceHref} alt="Evidence full view" className="w-full h-auto rounded-md cv-media-enter" />
             )}
             {post.evidenceType === 'video' && evidenceHref && (
-              <video controls className="w-full rounded-md" src={evidenceHref}>
+              <video controls className="w-full rounded-md cv-media-enter" src={evidenceHref}>
                 Your browser cannot play this video.
               </video>
             )}
             {post.evidenceType === 'document' && evidenceHref && (
-              <iframe title="Evidence document" src={evidenceHref} className="w-full h-[70vh] rounded-md border" />
+              <iframe title="Evidence document" src={evidenceHref} className="w-full h-[70vh] rounded-md border cv-media-enter" />
             )}
             {post.evidenceType && post.evidenceType !== 'photo' && post.evidenceType !== 'video' && post.evidenceType !== 'document' && evidenceHref && (
-              <iframe title="Evidence content" src={evidenceHref} className="w-full h-[70vh] rounded-md border" />
+              <iframe title="Evidence content" src={evidenceHref} className="w-full h-[70vh] rounded-md border cv-media-enter" />
             )}
           </div>
         </DialogContent>

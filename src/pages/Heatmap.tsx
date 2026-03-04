@@ -4,7 +4,7 @@ import { CivicHeatmap } from '@/components/CivicHeatmap';
 import { LegalDisclaimer } from '@/components/LegalDisclaimer';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { TrendingUp, AlertTriangle, MapPin, BarChart3, Loader2 } from 'lucide-react';
+import { TrendingUp, AlertTriangle, MapPin, BarChart3 } from 'lucide-react';
 import { PostService } from '@/services/PostService';
 import { useQuery } from '@tanstack/react-query';
 import { CATEGORIES } from '@/lib/anonymity';
@@ -72,11 +72,13 @@ export default function Heatmap() {
             {statCards.map((stat) => {
               const Icon = stat.icon;
               return (
-                <Card key={stat.label} className="glass-card">
+                <Card key={stat.label} className="glass-card cv-stagger-enter">
                   <CardContent className="p-4">
                     <div className="flex items-start justify-between">
                       <div>
-                        <p className="text-2xl font-bold">{stat.value}</p>
+                        <p className={`text-2xl font-bold ${statsLoading ? 'cv-shimmer rounded w-20 h-8 text-transparent' : ''}`}>
+                          {stat.value}
+                        </p>
                         <p className="text-sm text-muted-foreground">{stat.label}</p>
                       </div>
                       <Icon className="h-5 w-5 text-primary" />
@@ -103,8 +105,16 @@ export default function Heatmap() {
             </CardHeader>
             <CardContent>
               {locationsLoading ? (
-                <div className="text-center py-8">
-                  <Loader2 className="h-6 w-6 animate-spin mx-auto text-muted-foreground" />
+                <div className="space-y-3 py-2">
+                  {Array.from({ length: 5 }).map((_, idx) => (
+                    <div key={idx} className="flex items-center justify-between p-3 rounded-lg bg-muted/20 border border-border/50 cv-stagger-enter" style={{ animationDelay: `${idx * 35}ms` }}>
+                      <div className="space-y-2 w-2/3">
+                        <div className="h-3 w-2/5 rounded cv-shimmer" />
+                        <div className="h-3 w-3/5 rounded cv-shimmer" />
+                      </div>
+                      <div className="h-3 w-16 rounded cv-shimmer" />
+                    </div>
+                  ))}
                 </div>
               ) : topLocations.length === 0 ? (
                 <p className="text-center text-muted-foreground py-4 text-sm">
@@ -112,10 +122,11 @@ export default function Heatmap() {
                 </p>
               ) : (
                 <div className="space-y-3">
-                  {topLocations.map((loc) => (
+                  {topLocations.map((loc, idx) => (
                     <div 
                       key={loc.location}
-                      className="flex items-center justify-between p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors"
+                      className="flex items-center justify-between p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors cv-interactive cv-stagger-enter"
+                      style={{ animationDelay: `${Math.min(idx * 35, 300)}ms` }}
                     >
                       <div className="flex items-center gap-3">
                         <div className={`w-3 h-3 rounded-full bg-severity-${loc.severity}`} />

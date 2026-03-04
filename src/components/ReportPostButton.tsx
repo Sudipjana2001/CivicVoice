@@ -17,6 +17,7 @@ export function ReportPostButton({ postId, initialCount = 0, className }: Report
   const { user } = useAuth();
   const [reportCount, setReportCount] = useState(initialCount);
   const [hasReported, setHasReported] = useState(false);
+  const [isFlagPopping, setIsFlagPopping] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
@@ -49,9 +50,11 @@ export function ReportPostButton({ postId, initialCount = 0, className }: Report
       onReported={() => {
         setHasReported(true);
         setReportCount((prev) => prev + 1);
+        setIsFlagPopping(true);
+        window.setTimeout(() => setIsFlagPopping(false), 260);
       }}
       trigger={
-        <Button variant="ghost" size="sm" className={triggerClass}>
+        <Button variant="ghost" size="sm" className={`${triggerClass} ${isFlagPopping ? 'cv-tap-pop' : ''}`.trim()}>
           <Flag className="h-4 w-4" />
           <span className="text-xs ml-1">{reportCount}</span>
         </Button>
