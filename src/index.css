@@ -298,6 +298,19 @@
   .cv-interactive:active {
     transform: translateY(0) scale(0.98);
   }
+
+  .cv-scroll-in {
+    opacity: 0;
+    transform: translateY(14px) scale(0.995);
+    transition: opacity 210ms cubic-bezier(0.22, 1, 0.36, 1),
+      transform 210ms cubic-bezier(0.22, 1, 0.36, 1);
+    will-change: opacity, transform;
+  }
+
+  .cv-scroll-in-visible {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
 }
 
 @keyframes cv-page-enter {
@@ -373,6 +386,13 @@
   .cv-media-enter,
   .cv-shimmer {
     animation: none !important;
+  }
+
+  .cv-scroll-in,
+  .cv-scroll-in-visible {
+    transition: none !important;
+    opacity: 1 !important;
+    transform: none !important;
   }
 
   .cv-interactive,

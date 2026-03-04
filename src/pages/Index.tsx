@@ -8,6 +8,7 @@ import { Footer } from '@/components/Footer';
 import { LegalDisclaimer } from '@/components/LegalDisclaimer';
 import { TopicFollowing } from '@/components/TopicFollowing';
 import { CommentsCard } from '@/components/CommentsCard';
+import { ScrollReveal } from '@/components/ScrollReveal';
 import { PostService } from '@/services/PostService';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
@@ -87,7 +88,7 @@ export default function Index() {
           fetchNextPage();
         }
       },
-      { rootMargin: '120px 0px' }
+      { rootMargin: '520px 0px' }
     );
     observer.observe(node);
     return () => observer.disconnect();
@@ -289,10 +290,9 @@ export default function Index() {
           ) : filteredPosts.length > 0 ? (
             <>
               {filteredPosts.map((post, idx) => (
-                <div
+                <ScrollReveal
                   key={post.id}
-                  className="cv-stagger-enter"
-                  style={{ animationDelay: `${Math.min(idx * 70, 560)}ms` }}
+                  delayMs={Math.min((idx % POSTS_PAGE_SIZE) * 18, 126)}
                 >
                   <PostWithComments
                     post={post}
@@ -300,7 +300,7 @@ export default function Index() {
                     onCommentsClick={handleCommentsClick}
                     onCloseComments={handleCloseComments}
                   />
-                </div>
+                </ScrollReveal>
               ))}
 
               <div ref={loadMoreRef} className="h-4" />
