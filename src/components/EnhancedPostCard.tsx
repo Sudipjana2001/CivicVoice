@@ -91,8 +91,8 @@ export function EnhancedPostCard({ post, onCommentsClick, isCommentsOpen, onPost
   const [isSubmittingEdit, setIsSubmittingEdit] = useState(false);
 
   const session = getAnonymousSession();
-  // Check ownership via auth user_id OR anonymous session id
-  const isOwner = (user?.id && post.userId && user.id === post.userId) || (session.id === post.anonymousId);
+  // Ownership is server-backed through posts.user_id
+  const isOwner = Boolean(user?.id && post.userId && user.id === post.userId);
 
   // Fetch existing vote on mount
   useEffect(() => {
@@ -139,9 +139,6 @@ export function EnhancedPostCard({ post, onCommentsClick, isCommentsOpen, onPost
         post.id,
         session.token,
         type,
-        userVote,
-        credibleVotes,
-        suspiciousVotes,
       );
       setUserVote(result.newVote);
       setCredibleVotes(result.credibleVotes);

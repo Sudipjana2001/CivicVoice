@@ -1,9 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Send, Clock, LogIn, Loader2 } from 'lucide-react';
 import { CommentService } from '@/services/CommentService';
+import type { CommentRow } from '@/services/CommentService';
 import { useAuth } from '@/hooks/useAuth';
 import { useNavigate } from 'react-router-dom';
 import { formatDistanceToNow } from 'date-fns';
@@ -20,16 +21,12 @@ interface CommentsSectionProps {
 export function CommentsSection({ postId, initialCount, isFullPage }: CommentsSectionProps) {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const [comments, setComments] = useState<any[]>([]);
+  const [comments, setComments] = useState<CommentRow[]>([]);
   const [newComment, setNewComment] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  useEffect(() => {
-    fetchComments();
-  }, [postId]);
-
-  const fetchComments = async () => {
+  const fetchComments = useCallback(async () => {
     setIsLoading(true);
     try {
       const data = await commentService.fetchByPostId(postId);
@@ -38,7 +35,11 @@ export function CommentsSection({ postId, initialCount, isFullPage }: CommentsSe
       console.error('Error fetching comments:', error);
     }
     setIsLoading(false);
-  };
+  }, [postId]);
+
+  useEffect(() => {
+    fetchComments();
+  }, [fetchComments]);
 
   const handleSubmit = async () => {
     if (!user) {

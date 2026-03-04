@@ -1,4 +1,7 @@
 import { supabase } from '@/integrations/supabase/client';
+import type { Tables } from '@/integrations/supabase/types';
+
+export type CommentRow = Tables<'comments'>;
 
 /**
  * CommentService - Handles all comment-related database operations.
@@ -17,7 +20,7 @@ export class CommentService {
   }
 
   /** Fetch comments for a specific post, ordered newest first. */
-  async fetchByPostId(postId: string): Promise<any[]> {
+  async fetchByPostId(postId: string): Promise<CommentRow[]> {
     const { data, error } = await supabase
       .from('comments')
       .select('*')
@@ -29,29 +32,18 @@ export class CommentService {
   }
 
   /** Create a new comment and increment the post's comment count. */
-  async create(postId: string, content: string): Promise<any> {
-    const { data, error } = await supabase
-      .from('comments')
-      .insert({ post_id: postId, content: content.trim() })
-      .select()
-      .single();
-
-    if (error) throw error;
-
-    // Increment comment count on the post
-    const { data: postData } = await supabase
-      .from('posts')
-      .select('comment_count')
-      .eq('id', postId)
-      .single();
-
-    if (postData) {
-      await supabase
-        .from('posts')
-        .update({ comment_count: postData.comment_count + 1 })
-        .eq('id', postId);
+  async create(postId: string, content: string): Promise<CommentRow> {
+    const trimmed = content.trim();
+    if (!trimmed) {
+      throw new Error('Comment content cannot be empty');
     }
 
-    return data;
+    const { data, error } = await supabase.rpc('create_comment_and_increment', {
+      p_post_id: postId,
+      p_content: trimmed,
+    });
+
+    if (error) throw error;
+    return data as CommentRow;
   }
 }

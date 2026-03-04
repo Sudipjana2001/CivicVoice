@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { 
   Bell, 
   BellRing, 
@@ -40,11 +40,7 @@ export function SmartAlerts() {
 
   const session = getAnonymousSession();
 
-  useEffect(() => {
-    if (open && user) fetchAlerts();
-  }, [open, user]);
-
-  const fetchAlerts = async () => {
+  const fetchAlerts = useCallback(async () => {
     setLoading(true);
     try {
       const data = await inboxService.fetchAlerts(session.id);
@@ -53,7 +49,11 @@ export function SmartAlerts() {
       console.error('Error fetching alerts:', error);
     }
     setLoading(false);
-  };
+  }, [session.id]);
+
+  useEffect(() => {
+    if (open && user) fetchAlerts();
+  }, [open, user, fetchAlerts]);
 
   const unreadCount = alerts.filter(a => !a.read).length;
 

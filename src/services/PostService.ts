@@ -1,5 +1,22 @@
 import { supabase } from '@/integrations/supabase/client';
+import type { TablesUpdate } from '@/integrations/supabase/types';
 import type { Post, Category, Severity, EvidenceType } from '@/lib/anonymity';
+
+interface PostRow {
+  id: string;
+  anonymous_id: string;
+  content: string;
+  category: string;
+  severity: string;
+  evidence_type: string | null;
+  location: string | null;
+  image_url: string | null;
+  created_at: string;
+  credible_votes: number;
+  suspicious_votes: number;
+  comment_count: number;
+  user_id: string | null;
+}
 
 /**
  * PostService - Handles all post-related database operations.
@@ -18,7 +35,7 @@ export class PostService {
   }
 
   /** Map a Supabase row to the local Post type. */
-  mapRowToPost(row: any): Post & { userId?: string } {
+  mapRowToPost(row: PostRow): Post & { userId?: string } {
     return {
       id: row.id,
       anonymousId: row.anonymous_id,
@@ -88,9 +105,14 @@ export class PostService {
       selfDestructAt = date.toISOString();
     }
 
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
     const { data, error } = await supabase
       .from('posts')
       .insert({
+        user_id: user?.id || null,
         content: params.content.trim(),
         category: params.category,
         severity: params.severity,
@@ -129,7 +151,7 @@ export class PostService {
     severity?: Severity;
     location?: string;
   }): Promise<void> {
-    const updateData: Record<string, any> = {};
+    const updateData: TablesUpdate<'posts'> = {};
     if (updates.content !== undefined) updateData.content = updates.content.trim();
     if (updates.category !== undefined) updateData.category = updates.category;
     if (updates.severity !== undefined) updateData.severity = updates.severity;

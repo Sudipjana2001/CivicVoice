@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { 
   Inbox, 
   Mail, 
@@ -54,12 +54,7 @@ export function AnonymousInbox({ className }: AnonymousInboxProps) {
 
   const session = getAnonymousSession();
 
-  useEffect(() => {
-    if (user) fetchMessages();
-    else setLoading(false);
-  }, [user]);
-
-  const fetchMessages = async () => {
+  const fetchMessages = useCallback(async () => {
     setLoading(true);
     try {
       const data = await inboxService.fetchMessages(session.id);
@@ -68,7 +63,12 @@ export function AnonymousInbox({ className }: AnonymousInboxProps) {
       console.error('Error fetching inbox messages:', error);
     }
     setLoading(false);
-  };
+  }, [session.id]);
+
+  useEffect(() => {
+    if (user) fetchMessages();
+    else setLoading(false);
+  }, [user, fetchMessages]);
 
   const unreadCount = messages.filter(m => !m.read).length;
 

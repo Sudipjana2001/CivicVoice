@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
@@ -97,13 +97,7 @@ export default function Profile() {
     }
   }, [user, authLoading, navigate]);
 
-  useEffect(() => {
-    if (user) {
-      fetchProfileData();
-    }
-  }, [user]);
-
-  const fetchProfileData = async () => {
+  const fetchProfileData = useCallback(async () => {
     if (!user) return;
     
     try {
@@ -156,7 +150,13 @@ export default function Profile() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [user]);
+
+  useEffect(() => {
+    if (user) {
+      fetchProfileData();
+    }
+  }, [user, fetchProfileData]);
 
   const updateProfile = async (updates: Partial<Profile>) => {
     if (!profile) return;

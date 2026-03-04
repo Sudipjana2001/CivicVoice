@@ -95,7 +95,7 @@ export default function CommentsPage() {
 
     try {
       const result = await voteService.toggleVote(
-        post.id, session.token, type, userVote, credibleVotes, suspiciousVotes
+        post.id, session.token, type
       );
       setUserVote(result.newVote);
       setCredibleVotes(result.credibleVotes);

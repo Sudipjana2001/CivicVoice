@@ -23,11 +23,17 @@ export const PRIVACY_HEADERS = {
  * - Removes potential steganographic markers
  */
 export function sanitizeText(text: string): string {
-  return text
+  const withoutControlChars = Array.from(text)
+    .filter((char) => {
+      const code = char.charCodeAt(0);
+      const isControl = (code >= 0 && code <= 8) || code === 11 || code === 12 || (code >= 14 && code <= 31) || code === 127;
+      return !isControl;
+    })
+    .join('');
+
+  return withoutControlChars
     // Remove zero-width characters (can be used for fingerprinting)
     .replace(/[\u200B-\u200D\uFEFF\u2060\u2061\u2062\u2063\u2064]/g, '')
-    // Remove control characters
-    .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '')
     // Normalize whitespace (different keyboards produce different whitespace)
     .replace(/\s+/g, ' ')
     // Trim
