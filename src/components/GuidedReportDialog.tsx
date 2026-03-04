@@ -34,6 +34,7 @@ import { SelfDestructOptions } from './SelfDestructOptions';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useAuth } from '@/hooks/useAuth';
+import { EvidenceService } from '@/services/EvidenceService';
 
 interface GuidedReportDialogProps {
   onPostCreated: () => void;
@@ -48,6 +49,8 @@ const STEPS: { id: Step; label: string; icon: React.ElementType }[] = [
   { id: 'evidence', label: 'Evidence', icon: Camera },
   { id: 'review', label: 'Review', icon: Check },
 ];
+
+const evidenceService = EvidenceService.getInstance();
 
 export function GuidedReportDialog({ onPostCreated }: GuidedReportDialogProps) {
   const [open, setOpen] = useState(false);
@@ -367,26 +370,8 @@ export function GuidedReportDialog({ onPostCreated }: GuidedReportDialogProps) {
                           uploadFile = await stripImageMetadata(file);
                         }
 
-                        const fileName = `${crypto.randomUUID()}_${file.name.replace(/[^a-zA-Z0-9._-]/g, '')}`;
-                        const { data, error } = await supabase.storage
-                          .from('evidence')
-                          .upload(fileName, uploadFile, {
-                            cacheControl: '3600',
-                            contentType: file.type || undefined,
-                            upsert: false,
-                          });
-
-                        if (error) {
-                          toast.error(`Upload failed: ${error.message}`);
-                          console.error('Upload error:', error);
-                          return;
-                        }
-
-                        const { data: urlData } = supabase.storage
-                          .from('evidence')
-                          .getPublicUrl(data.path);
-
-                        setImageUrl(urlData.publicUrl);
+                        const publicUrl = await evidenceService.uploadEvidence(file, uploadFile);
+                        setImageUrl(publicUrl);
                         toast.success('File uploaded successfully');
                       } catch (err) {
                         console.error('Upload error:', err);

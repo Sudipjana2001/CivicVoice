@@ -80,5 +80,6 @@ export interface Post {
   credibleVotes: number;
   suspiciousVotes: number;
   commentCount: number;
+  reportCount?: number;
   userId?: string;
 }

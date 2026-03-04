@@ -1,7 +1,8 @@
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Clock, MapPin, ThumbsUp, ThumbsDown, Share2, Flag, Camera, Video, FileText, Users, Loader2 } from 'lucide-react';
+import { ArrowLeft, Clock, MapPin, ThumbsUp, ThumbsDown, Share2, Camera, Video, FileText, Users, Loader2, ExternalLink } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { CommentsSection } from '@/components/CommentsSection';
 import { CategoryBadge } from '@/components/CategoryBadge';
 import { SeverityBadge } from '@/components/SeverityBadge';
@@ -9,6 +10,7 @@ import { IncidentStatusBadge } from '@/components/IncidentStatusBadge';
 import { EvidenceConfidenceScore } from '@/components/EvidenceConfidenceScore';
 import { CredibilityBadge } from '@/components/CredibilityBadge';
 import { LegalDisclaimer } from '@/components/LegalDisclaimer';
+import { ReportPostButton } from '@/components/ReportPostButton';
 import { PostService } from '@/services/PostService';
 import { VoteService } from '@/services/VoteService';
 import { useAuth } from '@/hooks/useAuth';
@@ -45,6 +47,7 @@ export default function CommentsPage() {
   const [suspiciousVotes, setSuspiciousVotes] = useState(0);
   const [userVote, setUserVote] = useState<'credible' | 'suspicious' | null>(null);
   const [isVoting, setIsVoting] = useState(false);
+  const [isEvidenceViewerOpen, setIsEvidenceViewerOpen] = useState(false);
 
   useEffect(() => {
     if (post) {
@@ -109,6 +112,7 @@ export default function CommentsPage() {
   };
 
   const EvidenceIcon = post.evidenceType ? evidenceIconMap[post.evidenceType] : null;
+  const evidenceHref = post.imageUrl ?? null;
 
   return (
     <div className="min-h-screen bg-background">
@@ -126,16 +130,37 @@ export default function CommentsPage() {
       <div className="p-4">
         <Card className="glass-card overflow-hidden mb-4">
           <CardContent className="p-0">
-            {post.imageUrl && (
+            {evidenceHref && (
               <div className="relative h-48 overflow-hidden">
-                <img 
-                  src={post.imageUrl} 
-                  alt="Evidence" 
-                  className="w-full h-full object-cover"
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-card to-transparent" />
+                {post.evidenceType === 'photo' ? (
+                  <button type="button" onClick={() => setIsEvidenceViewerOpen(true)} className="block w-full h-full">
+                    <img
+                      src={evidenceHref}
+                      alt="Evidence"
+                      className="w-full h-full object-cover cursor-zoom-in"
+                    />
+                  </button>
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center bg-muted/40">
+                    <div className="text-center space-y-2">
+                      {post.evidenceType === 'video' ? (
+                        <Video className="h-8 w-8 mx-auto text-muted-foreground" />
+                      ) : (
+                        <FileText className="h-8 w-8 mx-auto text-muted-foreground" />
+                      )}
+                      <p className="text-xs text-muted-foreground">Evidence available</p>
+                    </div>
+                  </div>
+                )}
+                <div className="absolute inset-0 bg-gradient-to-t from-card to-transparent pointer-events-none" />
                 <div className="absolute top-2 right-2 bg-card/80 backdrop-blur-sm px-2 py-1 rounded text-xs text-muted-foreground">
                   Faces auto-blurred
+                </div>
+                <div className="absolute bottom-2 right-2">
+                  <Button size="sm" variant="secondary" className="gap-1 h-8" onClick={() => setIsEvidenceViewerOpen(true)}>
+                    <ExternalLink className="h-3.5 w-3.5" />
+                    View Evidence
+                  </Button>
                 </div>
               </div>
             )}
@@ -216,9 +241,11 @@ export default function CommentsPage() {
                   <Button variant="ghost" size="sm" className="px-2 h-8 text-muted-foreground hover:text-foreground">
                     <Share2 className="h-4 w-4" />
                   </Button>
-                  <Button variant="ghost" size="sm" className="px-2 h-8 text-muted-foreground hover:text-destructive">
-                    <Flag className="h-4 w-4" />
-                  </Button>
+                  <ReportPostButton
+                    postId={post.id}
+                    initialCount={post.reportCount}
+                    className="px-2 h-8 text-muted-foreground hover:text-destructive"
+                  />
                 </div>
               </div>
             </div>
@@ -233,6 +260,29 @@ export default function CommentsPage() {
           </CardContent>
         </Card>
       </div>
+      <Dialog open={isEvidenceViewerOpen} onOpenChange={setIsEvidenceViewerOpen}>
+        <DialogContent className="sm:max-w-4xl max-h-[90vh] overflow-hidden">
+          <DialogHeader>
+            <DialogTitle>Evidence Viewer</DialogTitle>
+          </DialogHeader>
+          <div className="w-full max-h-[75vh] overflow-auto">
+            {post.evidenceType === 'photo' && evidenceHref && (
+              <img src={evidenceHref} alt="Evidence full view" className="w-full h-auto rounded-md" />
+            )}
+            {post.evidenceType === 'video' && evidenceHref && (
+              <video controls className="w-full rounded-md" src={evidenceHref}>
+                Your browser cannot play this video.
+              </video>
+            )}
+            {post.evidenceType === 'document' && evidenceHref && (
+              <iframe title="Evidence document" src={evidenceHref} className="w-full h-[70vh] rounded-md border" />
+            )}
+            {post.evidenceType && post.evidenceType !== 'photo' && post.evidenceType !== 'video' && post.evidenceType !== 'document' && evidenceHref && (
+              <iframe title="Evidence content" src={evidenceHref} className="w-full h-[70vh] rounded-md border" />
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -15,6 +15,7 @@ interface PostRow {
   credible_votes: number;
   suspicious_votes: number;
   comment_count: number;
+  report_count: number;
   user_id: string | null;
 }
 
@@ -49,6 +50,7 @@ export class PostService {
       credibleVotes: row.credible_votes,
       suspiciousVotes: row.suspicious_votes,
       commentCount: row.comment_count,
+      reportCount: row.report_count ?? 0,
       userId: row.user_id || undefined,
     };
   }

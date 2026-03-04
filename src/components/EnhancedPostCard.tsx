@@ -8,12 +8,12 @@ import {
   ThumbsDown, 
   MessageCircle, 
   Share2, 
-  Flag,
   FileText,
   Camera,
   Video,
   Users,
   Link2,
+  ExternalLink,
   ChevronDown,
   ChevronUp,
   LogIn,
@@ -26,6 +26,7 @@ import {
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -40,6 +41,7 @@ import { VisibilityTags } from './VisibilityTags';
 import { CredibilityBadge } from './CredibilityBadge';
 import { LegalDisclaimer } from './LegalDisclaimer';
 import { RelatedIncidents } from './RelatedIncidents';
+import { ReportPostButton } from './ReportPostButton';
 
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useAuth } from '@/hooks/useAuth';
@@ -91,6 +93,7 @@ export function EnhancedPostCard({ post, onCommentsClick, isCommentsOpen, onPost
   const [editContent, setEditContent] = useState(post.content);
   const [isContentExpanded, setIsContentExpanded] = useState(false);
   const [isSubmittingEdit, setIsSubmittingEdit] = useState(false);
+  const [isEvidenceViewerOpen, setIsEvidenceViewerOpen] = useState(false);
 
   const session = getAnonymousSession();
   // Ownership is server-backed through posts.user_id
@@ -203,20 +206,43 @@ export function EnhancedPostCard({ post, onCommentsClick, isCommentsOpen, onPost
   const displayContent = isContentExpanded || !isLongContent
     ? post.content
     : `${post.content.slice(0, CONTENT_PREVIEW_LIMIT).trimEnd()}...`;
+  const evidenceHref = post.imageUrl ?? null;
 
   return (
+    <>
     <Card className="glass-card overflow-hidden animate-fade-in hover:border-border transition-colors">
       <CardContent className="p-0">
-        {post.imageUrl && (
+        {evidenceHref && (
           <div className="relative h-48 overflow-hidden">
-            <img 
-              src={post.imageUrl} 
-              alt="Evidence" 
-              className="w-full h-full object-cover"
-            />
-            <div className="absolute inset-0 bg-gradient-to-t from-card to-transparent" />
+            {post.evidenceType === 'photo' ? (
+              <button type="button" onClick={() => setIsEvidenceViewerOpen(true)} className="block w-full h-full">
+                <img
+                  src={evidenceHref}
+                  alt="Evidence"
+                  className="w-full h-full object-cover cursor-zoom-in"
+                />
+              </button>
+            ) : (
+              <div className="w-full h-full flex items-center justify-center bg-muted/40">
+                <div className="text-center space-y-2">
+                  {post.evidenceType === 'video' ? (
+                    <Video className="h-8 w-8 mx-auto text-muted-foreground" />
+                  ) : (
+                    <FileText className="h-8 w-8 mx-auto text-muted-foreground" />
+                  )}
+                  <p className="text-xs text-muted-foreground">Evidence available</p>
+                </div>
+              </div>
+            )}
+            <div className="absolute inset-0 bg-gradient-to-t from-card to-transparent pointer-events-none" />
             <div className="absolute top-2 right-2 bg-card/80 backdrop-blur-sm px-2 py-1 rounded text-xs text-muted-foreground">
               Faces auto-blurred
+            </div>
+            <div className="absolute bottom-2 right-2">
+              <Button size="sm" variant="secondary" className="gap-1 h-8" onClick={() => setIsEvidenceViewerOpen(true)}>
+                <ExternalLink className="h-3.5 w-3.5" />
+                View Evidence
+              </Button>
             </div>
           </div>
         )}
@@ -401,14 +427,40 @@ export function EnhancedPostCard({ post, onCommentsClick, isCommentsOpen, onPost
                   </DropdownMenuContent>
                 </DropdownMenu>
               ) : (
-                <Button variant="ghost" size="sm" className="px-2 sm:px-3 text-muted-foreground hover:text-destructive">
-                  <Flag className="h-4 w-4" />
-                </Button>
+                <ReportPostButton
+                  postId={post.id}
+                  initialCount={post.reportCount}
+                  className="px-2 sm:px-3 text-muted-foreground hover:text-destructive"
+                />
               )}
             </div>
           </div>
         </div>
       </CardContent>
     </Card>
+    <Dialog open={isEvidenceViewerOpen} onOpenChange={setIsEvidenceViewerOpen}>
+      <DialogContent className="sm:max-w-4xl max-h-[90vh] overflow-hidden">
+        <DialogHeader>
+          <DialogTitle>Evidence Viewer</DialogTitle>
+        </DialogHeader>
+        <div className="w-full max-h-[75vh] overflow-auto">
+          {post.evidenceType === 'photo' && evidenceHref && (
+            <img src={evidenceHref} alt="Evidence full view" className="w-full h-auto rounded-md" />
+          )}
+          {post.evidenceType === 'video' && evidenceHref && (
+            <video controls className="w-full rounded-md" src={evidenceHref}>
+              Your browser cannot play this video.
+            </video>
+          )}
+          {post.evidenceType === 'document' && evidenceHref && (
+            <iframe title="Evidence document" src={evidenceHref} className="w-full h-[70vh] rounded-md border" />
+          )}
+          {post.evidenceType && post.evidenceType !== 'photo' && post.evidenceType !== 'video' && post.evidenceType !== 'document' && evidenceHref && (
+            <iframe title="Evidence content" src={evidenceHref} className="w-full h-[70vh] rounded-md border" />
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
+    </>
   );
 }

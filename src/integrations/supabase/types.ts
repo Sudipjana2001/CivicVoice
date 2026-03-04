@@ -238,6 +238,7 @@ export type Database = {
           credible_votes: number
           suspicious_votes: number
           comment_count: number
+          report_count: number
           status: string
           self_destruct_at: string | null
           created_at: string
@@ -255,6 +256,7 @@ export type Database = {
           credible_votes?: number
           suspicious_votes?: number
           comment_count?: number
+          report_count?: number
           status?: string
           self_destruct_at?: string | null
           created_at?: string
@@ -272,12 +274,51 @@ export type Database = {
           credible_votes?: number
           suspicious_votes?: number
           comment_count?: number
+          report_count?: number
           status?: string
           self_destruct_at?: string | null
           created_at?: string
           user_id?: string | null
         }
         Relationships: []
+      }
+      post_reports: {
+        Row: {
+          id: string
+          post_id: string
+          reporter_user_id: string
+          reason: string
+          details: string | null
+          status: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          post_id: string
+          reporter_user_id: string
+          reason: string
+          details?: string | null
+          status?: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          post_id?: string
+          reporter_user_id?: string
+          reason?: string
+          details?: string | null
+          status?: string
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "post_reports_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: false
+            referencedRelation: "posts"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       profiles: {
         Row: {
