@@ -4,17 +4,51 @@ import { CivicHeatmap } from '@/components/CivicHeatmap';
 import { LegalDisclaimer } from '@/components/LegalDisclaimer';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { TrendingUp, AlertTriangle, MapPin, BarChart3 } from 'lucide-react';
+import { TrendingUp, AlertTriangle, MapPin, BarChart3, Loader2 } from 'lucide-react';
+import { PostService } from '@/services/PostService';
+import { useQuery } from '@tanstack/react-query';
+import { CATEGORIES } from '@/lib/anonymity';
 
-// Mock statistics
-const stats = [
-  { label: 'Total Incidents', value: '156', icon: BarChart3, trend: '+12% this week' },
-  { label: 'Active Hotspots', value: '8', icon: MapPin, trend: '2 new' },
-  { label: 'Critical Reports', value: '23', icon: AlertTriangle, trend: 'Requires attention' },
-  { label: 'Trending Category', value: 'Corruption', icon: TrendingUp, trend: '+45% increase' },
-];
+const postService = PostService.getInstance();
 
 export default function Heatmap() {
+  const { data: stats, isLoading: statsLoading } = useQuery({
+    queryKey: ['heatmap-stats'],
+    queryFn: () => postService.fetchStats(),
+  });
+
+  const { data: topLocations = [], isLoading: locationsLoading } = useQuery({
+    queryKey: ['top-locations'],
+    queryFn: () => postService.fetchTopLocations(),
+  });
+
+  const statCards = [
+    { 
+      label: 'Total Incidents', 
+      value: statsLoading ? '—' : String(stats?.totalIncidents || 0), 
+      icon: BarChart3, 
+      trend: 'All time' 
+    },
+    { 
+      label: 'Active Hotspots', 
+      value: statsLoading ? '—' : String(stats?.activeHotspots || 0), 
+      icon: MapPin, 
+      trend: 'Unique locations' 
+    },
+    { 
+      label: 'Critical Reports', 
+      value: statsLoading ? '—' : String(stats?.criticalReports || 0), 
+      icon: AlertTriangle, 
+      trend: 'High + Critical' 
+    },
+    { 
+      label: 'Trending Category', 
+      value: statsLoading ? '—' : (CATEGORIES.find(c => c.id === stats?.trendingCategory)?.label || stats?.trendingCategory || 'None'), 
+      icon: TrendingUp, 
+      trend: 'Most reports' 
+    },
+  ];
+
   return (
     <div className="min-h-screen flex flex-col bg-background">
       <Header />
@@ -35,7 +69,7 @@ export default function Heatmap() {
 
           {/* Statistics */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            {stats.map((stat) => {
+            {statCards.map((stat) => {
               const Icon = stat.icon;
               return (
                 <Card key={stat.label} className="glass-card">
@@ -68,39 +102,30 @@ export default function Heatmap() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="space-y-3">
-                {[
-                  { location: 'Metro District', count: 23, change: '+5', severity: 'high' },
-                  { location: 'Central Hospital Area', count: 15, change: '+3', severity: 'high' },
-                  { location: 'Highway 47 Section', count: 12, change: '+2', severity: 'medium' },
-                  { location: 'Old Town Market', count: 9, change: '0', severity: 'medium' },
-                  { location: 'Riverside Colony', count: 8, change: '-1', severity: 'low' },
-                ].map((loc) => (
-                  <div 
-                    key={loc.location}
-                    className="flex items-center justify-between p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors"
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className={`w-3 h-3 rounded-full bg-severity-${loc.severity}`} />
-                      <span className="font-medium">{loc.location}</span>
+              {locationsLoading ? (
+                <div className="text-center py-8">
+                  <Loader2 className="h-6 w-6 animate-spin mx-auto text-muted-foreground" />
+                </div>
+              ) : topLocations.length === 0 ? (
+                <p className="text-center text-muted-foreground py-4 text-sm">
+                  No location-tagged reports yet
+                </p>
+              ) : (
+                <div className="space-y-3">
+                  {topLocations.map((loc) => (
+                    <div 
+                      key={loc.location}
+                      className="flex items-center justify-between p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className={`w-3 h-3 rounded-full bg-severity-${loc.severity}`} />
+                        <span className="font-medium">{loc.location}</span>
+                      </div>
+                      <span className="text-muted-foreground">{loc.count} incident{loc.count !== 1 ? 's' : ''}</span>
                     </div>
-                    <div className="flex items-center gap-4">
-                      <span className="text-muted-foreground">{loc.count} incidents</span>
-                      <Badge 
-                        variant="outline" 
-                        className={loc.change.startsWith('+') 
-                          ? 'border-severity-high text-severity-high' 
-                          : loc.change.startsWith('-')
-                          ? 'border-credible text-credible'
-                          : 'border-muted-foreground text-muted-foreground'
-                        }
-                      >
-                        {loc.change} this week
-                      </Badge>
-                    </div>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>

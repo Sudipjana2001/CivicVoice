@@ -53,7 +53,7 @@ export function EvidenceConfidenceScore({ level, size = 'sm' }: EvidenceConfiden
             <Info className={`${iconSize} opacity-50`} />
           </div>
         </TooltipTrigger>
-        <TooltipContent side="top" className="max-w-xs">
+        <TooltipContent side="bottom" className="max-w-xs z-[9999]">
           <div className="space-y-1">
             <p className="font-medium">Evidence Confidence: {config.label}</p>
             <p className="text-xs text-muted-foreground">{config.description}</p>

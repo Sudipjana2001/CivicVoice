@@ -1,5 +1,5 @@
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Clock, MapPin, ThumbsUp, ThumbsDown, Share2, Flag, Camera, Video, FileText, Users } from 'lucide-react';
+import { ArrowLeft, Clock, MapPin, ThumbsUp, ThumbsDown, Share2, Flag, Camera, Video, FileText, Users, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { CommentsSection } from '@/components/CommentsSection';
@@ -9,9 +9,18 @@ import { IncidentStatusBadge } from '@/components/IncidentStatusBadge';
 import { EvidenceConfidenceScore } from '@/components/EvidenceConfidenceScore';
 import { CredibilityBadge } from '@/components/CredibilityBadge';
 import { LegalDisclaimer } from '@/components/LegalDisclaimer';
-import type { EvidenceType } from '@/lib/anonymity';
+import { PostService } from '@/services/PostService';
+import { VoteService } from '@/services/VoteService';
+import { useAuth } from '@/hooks/useAuth';
+import { getAnonymousSession } from '@/lib/anonymity';
+import type { Post, EvidenceType } from '@/lib/anonymity';
 import { formatDistanceToNow } from 'date-fns';
 import { useState, useEffect } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { toast } from 'sonner';
+
+const postService = PostService.getInstance();
+const voteService = VoteService.getInstance();
 
 const evidenceIconMap: Record<EvidenceType, React.ElementType> = {
   photo: Camera,
@@ -20,68 +29,22 @@ const evidenceIconMap: Record<EvidenceType, React.ElementType> = {
   witness: Users,
 };
 
-// Mock post data - in production this would come from database
-const mockPosts: Record<string, any> = {
-  '1': {
-    id: '1',
-    anonymousId: 'CVC-7X9K2M',
-    category: 'corruption',
-    severity: 'high',
-    content: 'Witnessed cash exchange between municipal inspector and construction company representative. Inspector then approved permit that had been previously denied. Evidence includes timestamped photos.',
-    location: 'Downtown District',
-    createdAt: new Date(Date.now() - 3600000),
-    credibleVotes: 47,
-    suspiciousVotes: 3,
-    commentCount: 12,
-    evidenceType: 'photo' as EvidenceType,
-    imageUrl: 'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?w=600',
-    status: 'under_review',
-    confidenceScore: 'high',
-    credibilityBadge: { level: 'trusted', reportsCount: 12, credibilityScore: 92 },
-  },
-  '2': {
-    id: '2',
-    anonymousId: 'CVC-3P8L1N',
-    category: 'infrastructure',
-    severity: 'medium',
-    content: 'Road repair funds allocated 6 months ago but work never started. Official documents show payment processed to contractor. Multiple potholes causing accidents.',
-    location: 'North Highway',
-    createdAt: new Date(Date.now() - 86400000),
-    credibleVotes: 89,
-    suspiciousVotes: 7,
-    commentCount: 23,
-    evidenceType: 'document' as EvidenceType,
-    status: 'resolved',
-    confidenceScore: 'medium',
-    credibilityBadge: { level: 'established', reportsCount: 5, credibilityScore: 78 },
-  },
-  '3': {
-    id: '3',
-    anonymousId: 'CVC-9D4F2K',
-    category: 'environment',
-    severity: 'critical',
-    content: 'Factory discharging waste into river after midnight. Captured video evidence of discharge pipes and discolored water. Fish deaths reported downstream.',
-    location: 'Industrial Zone B',
-    createdAt: new Date(Date.now() - 172800000),
-    credibleVotes: 156,
-    suspiciousVotes: 12,
-    commentCount: 45,
-    evidenceType: 'video' as EvidenceType,
-    imageUrl: 'https://images.unsplash.com/photo-1611273426858-450d8e3c9fce?w=600',
-    status: 'escalated',
-    confidenceScore: 'high',
-    credibilityBadge: { level: 'trusted', reportsCount: 8, credibilityScore: 88 },
-  },
-};
-
 export default function CommentsPage() {
   const { postId } = useParams<{ postId: string }>();
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const session = getAnonymousSession();
+
+  const { data: post, isLoading, error } = useQuery({
+    queryKey: ['post', postId],
+    queryFn: () => postService.fetchById(postId!),
+    enabled: !!postId,
+  });
+
   const [credibleVotes, setCredibleVotes] = useState(0);
   const [suspiciousVotes, setSuspiciousVotes] = useState(0);
   const [userVote, setUserVote] = useState<'credible' | 'suspicious' | null>(null);
-
-  const post = postId ? mockPosts[postId] : null;
+  const [isVoting, setIsVoting] = useState(false);
 
   useEffect(() => {
     if (post) {
@@ -90,7 +53,23 @@ export default function CommentsPage() {
     }
   }, [post]);
 
-  if (!post) {
+  useEffect(() => {
+    if (post && user) {
+      voteService.getUserVote(post.id, session.token).then(vote => {
+        if (vote) setUserVote(vote);
+      });
+    }
+  }, [post, user, session.token]);
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (!post || error) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-center">
@@ -104,27 +83,28 @@ export default function CommentsPage() {
     );
   }
 
-  const handleVote = (type: 'credible' | 'suspicious') => {
-    if (userVote === type) {
-      if (type === 'credible') {
-        setCredibleVotes(prev => prev - 1);
-      } else {
-        setSuspiciousVotes(prev => prev - 1);
-      }
-      setUserVote(null);
-    } else {
-      if (userVote === 'credible') {
-        setCredibleVotes(prev => prev - 1);
-      } else if (userVote === 'suspicious') {
-        setSuspiciousVotes(prev => prev - 1);
-      }
-      
-      if (type === 'credible') {
-        setCredibleVotes(prev => prev + 1);
-      } else {
-        setSuspiciousVotes(prev => prev + 1);
-      }
-      setUserVote(type);
+  const handleVote = async (type: 'credible' | 'suspicious') => {
+    if (!user) {
+      toast.error('Please sign in to vote', {
+        action: { label: 'Sign In', onClick: () => navigate('/auth') },
+      });
+      return;
+    }
+    if (isVoting) return;
+    setIsVoting(true);
+
+    try {
+      const result = await voteService.toggleVote(
+        post.id, session.token, type, userVote, credibleVotes, suspiciousVotes
+      );
+      setUserVote(result.newVote);
+      setCredibleVotes(result.credibleVotes);
+      setSuspiciousVotes(result.suspiciousVotes);
+    } catch (err) {
+      console.error('Vote error:', err);
+      toast.error('Failed to register vote');
+    } finally {
+      setIsVoting(false);
     }
   };
 
@@ -161,13 +141,13 @@ export default function CommentsPage() {
             )}
             
             <div className="p-4 space-y-3">
-              {/* Row 1: Status badges */}
+              {/* Status badges */}
               <div className="flex flex-wrap items-center gap-2">
-                <IncidentStatusBadge status={post.status || 'submitted'} size="sm" />
-                <EvidenceConfidenceScore level={post.confidenceScore || 'medium'} size="sm" />
+                <IncidentStatusBadge status="submitted" size="sm" />
+                <EvidenceConfidenceScore level="medium" size="sm" />
               </div>
 
-              {/* Row 2: Category and severity */}
+              {/* Category and severity */}
               <div className="flex flex-wrap items-center gap-2">
                 <CategoryBadge category={post.category} size="sm" />
                 <SeverityBadge severity={post.severity} size="sm" />
@@ -179,15 +159,13 @@ export default function CommentsPage() {
                 )}
               </div>
 
-              {/* Row 3: Anonymous ID and credibility badge */}
+              {/* Anonymous ID */}
               <div className="flex items-center gap-2">
                 <span className="anonymous-id text-xs font-medium">{post.anonymousId}</span>
-                {post.credibilityBadge && (
-                  <CredibilityBadge badge={post.credibilityBadge} />
-                )}
+                <CredibilityBadge badge={{ level: 'new', reportsCount: 1, credibilityScore: 75 }} />
               </div>
 
-              {/* Row 4: Time and location */}
+              {/* Time and location */}
               <div className="flex items-center gap-4 text-xs text-muted-foreground">
                 <span className="flex items-center gap-1">
                   <Clock className="h-3 w-3" />
@@ -216,6 +194,7 @@ export default function CommentsPage() {
                     variant="ghost"
                     size="sm"
                     onClick={() => handleVote('credible')}
+                    disabled={isVoting}
                     className={`px-2 h-8 ${userVote === 'credible' ? 'credibility-positive' : 'text-muted-foreground hover:text-credible'}`}
                   >
                     <ThumbsUp className="h-4 w-4" />
@@ -225,6 +204,7 @@ export default function CommentsPage() {
                     variant="ghost"
                     size="sm"
                     onClick={() => handleVote('suspicious')}
+                    disabled={isVoting}
                     className={`px-2 h-8 ${userVote === 'suspicious' ? 'credibility-negative' : 'text-muted-foreground hover:text-suspicious'}`}
                   >
                     <ThumbsDown className="h-4 w-4" />
@@ -245,7 +225,7 @@ export default function CommentsPage() {
           </CardContent>
         </Card>
 
-        {/* Comments section - full height on mobile */}
+        {/* Comments section */}
         <Card className="glass-card">
           <CardContent className="p-4">
             <h2 className="text-sm font-semibold mb-4">Comments ({post.commentCount})</h2>

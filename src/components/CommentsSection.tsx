@@ -1,29 +1,28 @@
 import { useState, useEffect } from 'react';
-import { Clock, Send } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { supabase } from '@/integrations/supabase/client';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Send, Clock, LogIn, Loader2 } from 'lucide-react';
+import { CommentService } from '@/services/CommentService';
+import { useAuth } from '@/hooks/useAuth';
+import { useNavigate } from 'react-router-dom';
 import { formatDistanceToNow } from 'date-fns';
 import { toast } from 'sonner';
 
-interface Comment {
-  id: string;
-  post_id: string;
-  anonymous_id: string;
-  content: string;
-  created_at: string;
-}
+const commentService = CommentService.getInstance();
 
 interface CommentsSectionProps {
   postId: string;
-  initialCount: number;
+  initialCount?: number;
   isFullPage?: boolean;
 }
 
-export function CommentsSection({ postId, initialCount, isFullPage = false }: CommentsSectionProps) {
-  const [comments, setComments] = useState<Comment[]>([]);
+export function CommentsSection({ postId, initialCount, isFullPage }: CommentsSectionProps) {
+  const { user } = useAuth();
+  const navigate = useNavigate();
+  const [comments, setComments] = useState<any[]>([]);
   const [newComment, setNewComment] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
@@ -32,113 +31,111 @@ export function CommentsSection({ postId, initialCount, isFullPage = false }: Co
 
   const fetchComments = async () => {
     setIsLoading(true);
-    const { data, error } = await supabase
-      .from('comments')
-      .select('*')
-      .eq('post_id', postId)
-      .order('created_at', { ascending: false });
-
-    if (error) {
+    try {
+      const data = await commentService.fetchByPostId(postId);
+      setComments(data);
+    } catch (error) {
       console.error('Error fetching comments:', error);
-    } else {
-      setComments(data || []);
     }
     setIsLoading(false);
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = async () => {
+    if (!user) {
+      toast.error('Please sign in to comment', {
+        action: {
+          label: 'Sign In',
+          onClick: () => navigate('/auth'),
+        },
+      });
+      return;
+    }
+
+    if (!newComment.trim()) return;
     
-    if (!newComment.trim()) {
-      toast.error('Please enter a comment');
-      return;
-    }
-
-    if (newComment.length > 500) {
-      toast.error('Comment must be less than 500 characters');
-      return;
-    }
-
     setIsSubmitting(true);
-    
-    const { data, error } = await supabase
-      .from('comments')
-      .insert({
-        post_id: postId,
-        content: newComment.trim()
-      })
-      .select()
-      .single();
-
-    if (error) {
-      console.error('Error submitting comment:', error);
-      toast.error('Failed to post comment');
-    } else {
+    try {
+      const data = await commentService.create(postId, newComment);
       setComments(prev => [data, ...prev]);
       setNewComment('');
       toast.success('Comment posted anonymously');
+    } catch (error) {
+      console.error('Error submitting comment:', error);
+      toast.error('Failed to post comment');
     }
-    
     setIsSubmitting(false);
   };
 
   return (
-    <div className="space-y-4">
+    <div className={`flex flex-col ${isFullPage ? 'h-auto' : 'h-full'}`}>
       {/* Comment input */}
-      <form onSubmit={handleSubmit} className="space-y-2">
-        <Textarea
-          placeholder="Write an anonymous comment..."
-          value={newComment}
-          onChange={(e) => setNewComment(e.target.value)}
-          className="min-h-[80px] resize-none bg-muted/30 border-border/50"
-          maxLength={500}
-        />
-        <div className="flex justify-between items-center">
-          <span className="text-xs text-muted-foreground">
-            {newComment.length}/500
-          </span>
-          <Button 
-            type="submit" 
-            size="sm" 
-            disabled={isSubmitting || !newComment.trim()}
-            className="gap-2"
-          >
-            <Send className="h-4 w-4" />
-            Post Anonymously
-          </Button>
-        </div>
-      </form>
-
-      {/* Comments list */}
-      <div className={`${isFullPage ? 'max-h-none' : 'max-h-[200px]'} overflow-y-auto scrollbar-hide space-y-3`}>
-        {isLoading ? (
-          <div className="text-center text-muted-foreground text-sm py-4">
-            Loading comments...
-          </div>
-        ) : comments.length === 0 ? (
-          <div className="text-center text-muted-foreground text-sm py-4">
-            No comments yet. Be the first to comment!
+      <div className="p-3 border-b border-border/50">
+        {user ? (
+          <div className="flex gap-2">
+            <Textarea
+              value={newComment}
+              onChange={(e) => setNewComment(e.target.value)}
+              placeholder="Add an anonymous comment..."
+              className="min-h-[60px] resize-none bg-muted/50 border-border text-sm"
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  handleSubmit();
+                }
+              }}
+            />
+            <Button
+              size="icon"
+              onClick={handleSubmit}
+              disabled={!newComment.trim() || isSubmitting}
+              className="flex-shrink-0"
+            >
+              <Send className="h-4 w-4" />
+            </Button>
           </div>
         ) : (
-          comments.map((comment) => (
-            <div 
-              key={comment.id}
-              className="p-3 rounded-lg bg-muted/30 border border-border/30"
-            >
-              <div className="flex items-center justify-between mb-2">
-                <span className="anonymous-id text-xs font-medium">
-                  {comment.anonymous_id}
-                </span>
-                <span className="flex items-center gap-1 text-xs text-muted-foreground">
-                  <Clock className="h-3 w-3" />
-                  {formatDistanceToNow(new Date(comment.created_at), { addSuffix: true })}
-                </span>
-              </div>
-              <p className="text-sm text-foreground/90">{comment.content}</p>
-            </div>
-          ))
+          <div className="flex items-center justify-center gap-2 py-2 text-sm text-muted-foreground">
+            <LogIn className="h-4 w-4" />
+            <span>
+              <button
+                onClick={() => navigate('/auth')}
+                className="text-primary hover:underline font-medium"
+              >
+                Sign in
+              </button>{' '}
+              to post a comment
+            </span>
+          </div>
         )}
       </div>
+
+      {/* Comments list */}
+      <ScrollArea className={isFullPage ? 'h-auto' : 'flex-1'}>
+        <div className="p-3 space-y-3">
+          {isLoading ? (
+            <div className="text-center py-8">
+              <Loader2 className="h-5 w-5 animate-spin mx-auto text-muted-foreground" />
+            </div>
+          ) : comments.length === 0 ? (
+            <p className="text-center text-sm text-muted-foreground py-4">
+              No comments yet. Be the first to comment!
+            </p>
+          ) : (
+            comments.map((comment) => (
+              <div key={comment.id} className="p-3 rounded-lg bg-muted/30 border border-border/50">
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="text-xs font-medium anonymous-id">{comment.anonymous_id}</span>
+                  <span className="text-xs text-muted-foreground flex items-center gap-1">
+                    <Clock className="h-3 w-3" />
+                    {formatDistanceToNow(new Date(comment.created_at), { addSuffix: true })}
+                  </span>
+                </div>
+                <p className="text-sm text-foreground/90">{comment.content}</p>
+              </div>
+            ))
+          )}
+        </div>
+      </ScrollArea>
     </div>
   );
 }

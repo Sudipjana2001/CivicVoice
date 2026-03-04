@@ -30,6 +30,9 @@ import {
   Loader2
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { EnhancedPostCard } from '@/components/EnhancedPostCard';
+import { Post } from '@/lib/anonymity';
+import { PostService } from '@/services/PostService';
 
 interface Profile {
   id: string;
@@ -84,6 +87,7 @@ export default function Profile() {
     weekly_digest: false
   });
   const [activities, setActivities] = useState<ActivityItem[]>([]);
+  const [userPosts, setUserPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -142,6 +146,10 @@ export default function Profile() {
         .order('created_at', { ascending: false })
         .limit(20);
       setActivities(activityData || []);
+
+      // Fetch user posts
+      const posts = await PostService.getInstance().fetchByUserId(user.id);
+      setUserPosts(posts);
 
     } catch (error) {
       console.error('Error fetching profile:', error);
@@ -267,40 +275,74 @@ export default function Profile() {
     <div className="min-h-screen bg-background">
       <Header />
       
-      <main className="container mx-auto px-4 py-8 max-w-4xl">
+      <main className="container mx-auto px-4 py-6 sm:py-8 max-w-4xl">
         {/* Profile Header */}
         <Card className="mb-6 border-border/50">
           <CardHeader>
-            <div className="flex items-start justify-between">
-              <div className="flex items-center gap-4">
-                <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center">
-                  <User className="h-8 w-8 text-primary" />
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+              <div className="flex items-center gap-3 sm:gap-4">
+                <div className="w-12 h-12 sm:w-16 sm:h-16 bg-primary/10 rounded-full flex items-center justify-center">
+                  <User className="h-6 w-6 sm:h-8 sm:w-8 text-primary" />
                 </div>
                 <div>
-                  <CardTitle className="flex items-center gap-2">
+                  <CardTitle className="flex flex-wrap items-center gap-2 text-base sm:text-lg">
                     {profile.anonymous_id}
                     {badge && <Badge variant={badge.variant}>{badge.label}</Badge>}
                   </CardTitle>
-                  <CardDescription className="flex items-center gap-4 mt-1">
-                    <span>{profile.reports_count} reports submitted</span>
+                  <CardDescription className="flex flex-wrap items-center gap-2 sm:gap-4 mt-1 text-xs sm:text-sm">
+                    <span>{profile.reports_count} reports</span>
                     <span>•</span>
                     <span>Credibility: {profile.credibility_score}%</span>
                   </CardDescription>
                 </div>
               </div>
-              <Button variant="outline" onClick={handleSignOut}>Sign Out</Button>
+              <Button variant="outline" size="sm" onClick={handleSignOut}>Sign Out</Button>
             </div>
           </CardHeader>
         </Card>
 
         {/* Profile Tabs */}
         <Tabs defaultValue="settings" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-4">
-            <TabsTrigger value="settings">Settings</TabsTrigger>
-            <TabsTrigger value="topics">Following</TabsTrigger>
-            <TabsTrigger value="alerts">Alerts</TabsTrigger>
-            <TabsTrigger value="activity">Activity</TabsTrigger>
+          <TabsList className="grid w-full grid-cols-5">
+            <TabsTrigger value="posts" className="text-xs sm:text-sm px-1 sm:px-3">My Reports</TabsTrigger>
+            <TabsTrigger value="settings" className="text-xs sm:text-sm px-1 sm:px-3">Settings</TabsTrigger>
+            <TabsTrigger value="topics" className="text-xs sm:text-sm px-1 sm:px-3">Following</TabsTrigger>
+            <TabsTrigger value="alerts" className="text-xs sm:text-sm px-1 sm:px-3">Alerts</TabsTrigger>
+            <TabsTrigger value="activity" className="text-xs sm:text-sm px-1 sm:px-3">Activity</TabsTrigger>
           </TabsList>
+
+          {/* My Reports Tab */}
+          <TabsContent value="posts" className="space-y-4">
+            <div className="flex flex-col gap-4">
+              {userPosts.length > 0 ? (
+                userPosts.map((post) => (
+                  <EnhancedPostCard 
+                    key={post.id} 
+                    post={post} 
+                    onPostDeleted={() => {
+                      // refresh posts after deletion
+                      PostService.getInstance().fetchByUserId(user.id).then(setUserPosts);
+                    }}
+                  />
+                ))
+              ) : (
+                <Card className="border-border/50 bg-muted/20">
+                  <CardContent className="flex flex-col items-center justify-center py-10 text-center">
+                    <FileText className="h-10 w-10 text-muted-foreground mb-3 opacity-20" />
+                    <p className="text-muted-foreground font-medium">No reports submitted yet</p>
+                    <p className="text-xs text-muted-foreground mt-1">Your anonymous reports will appear here</p>
+                    <Button 
+                      variant="link" 
+                      className="mt-2 text-primary"
+                      onClick={() => navigate('/')}
+                    >
+                      Go to Feed to report
+                    </Button>
+                  </CardContent>
+                </Card>
+              )}
+            </div>
+          </TabsContent>
 
           {/* Settings Tab */}
           <TabsContent value="settings">
@@ -311,11 +353,11 @@ export default function Profile() {
                   Privacy & Security
                 </CardTitle>
               </CardHeader>
-              <CardContent className="space-y-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <Label>Anonymous Inbox</Label>
-                    <p className="text-sm text-muted-foreground">
+              <CardContent className="space-y-5">
+                <div className="flex items-center justify-between gap-4">
+                  <div className="flex-1">
+                    <Label className="text-sm">Anonymous Inbox</Label>
+                    <p className="text-xs sm:text-sm text-muted-foreground mt-0.5">
                       Allow journalists and NGOs to send you messages
                     </p>
                   </div>
@@ -323,17 +365,18 @@ export default function Profile() {
                     checked={profile.inbox_enabled}
                     onCheckedChange={(checked) => updateProfile({ inbox_enabled: checked })}
                     disabled={saving}
+                    className="flex-shrink-0"
                   />
                 </div>
 
                 <Separator />
 
-                <div className="space-y-3">
-                  <Label className="flex items-center gap-2">
+                <div className="space-y-2">
+                  <Label className="flex items-center gap-2 text-sm">
                     <Clock className="h-4 w-4" />
                     Auto-Delete Posts
                   </Label>
-                  <p className="text-sm text-muted-foreground">
+                  <p className="text-xs sm:text-sm text-muted-foreground">
                     Automatically delete your posts after a set period
                   </p>
                   <Select
@@ -344,7 +387,7 @@ export default function Profile() {
                       })
                     }
                   >
-                    <SelectTrigger className="w-48">
+                    <SelectTrigger className="w-full sm:w-48">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -354,6 +397,54 @@ export default function Profile() {
                       <SelectItem value="90">After 90 days</SelectItem>
                     </SelectContent>
                   </Select>
+                </div>
+
+                <Separator />
+
+                {/* Emergency Wipe */}
+                <div className="space-y-2">
+                  <Label className="flex items-center gap-2 text-sm text-destructive">
+                    <AlertTriangle className="h-4 w-4" />
+                    Emergency Wipe
+                  </Label>
+                  <p className="text-xs sm:text-sm text-muted-foreground">
+                    Deletes all your data older than 6 months from the database, then erases 
+                    all local traces (cookies, storage, cache) from this device. 
+                    Your last 6 months of activity are preserved.
+                  </p>
+                  <Button 
+                    variant="destructive" 
+                    size="sm"
+                    onClick={async () => {
+                      if (!window.confirm(
+                        'This will:\n• Delete all your DB data older than 6 months\n• Erase ALL local data from this device\n• Redirect to a blank page\n\nYour last 6 months of posts, votes, and comments will be kept.\n\nContinue?'
+                      )) return;
+
+                      try {
+                        // Step 1: Delete old data from database
+                        const { DataWipeService } = await import('@/services/DataWipeService');
+                        const wipeService = DataWipeService.getInstance();
+                        const result = await wipeService.emergencyWipe(user!.id);
+                        
+                        if (result.success) {
+                          const total = Object.values(result.deletedCounts).reduce((a, b) => a + b, 0);
+                          alert(`Wiped ${total} records older than 6 months.\nNow clearing local data...`);
+                        }
+
+                        // Step 2: Wipe all local traces
+                        const { panicWipe } = await import('@/lib/privacyShield');
+                        panicWipe();
+                      } catch (err) {
+                        console.error('Wipe failed:', err);
+                        // Still wipe local data even if DB wipe fails
+                        const { panicWipe } = await import('@/lib/privacyShield');
+                        panicWipe();
+                      }
+                    }}
+                  >
+                    <AlertTriangle className="h-3 w-3 mr-1" />
+                    Emergency Wipe
+                  </Button>
                 </div>
               </CardContent>
             </Card>
@@ -464,11 +555,11 @@ export default function Profile() {
                   Control how and when you receive notifications
                 </CardDescription>
               </CardHeader>
-              <CardContent className="space-y-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <Label>New Incidents</Label>
-                    <p className="text-sm text-muted-foreground">
+              <CardContent className="space-y-5">
+                <div className="flex items-center justify-between gap-4">
+                  <div className="flex-1">
+                    <Label className="text-sm">New Incidents</Label>
+                    <p className="text-xs sm:text-sm text-muted-foreground mt-0.5">
                       Notify when new incidents appear in followed topics
                     </p>
                   </div>
@@ -477,15 +568,16 @@ export default function Profile() {
                     onCheckedChange={(checked) => 
                       updateAlertPreferences({ new_incidents: checked })
                     }
+                    className="flex-shrink-0"
                   />
                 </div>
 
                 <Separator />
 
-                <div className="flex items-center justify-between">
-                  <div>
-                    <Label>Status Updates</Label>
-                    <p className="text-sm text-muted-foreground">
+                <div className="flex items-center justify-between gap-4">
+                  <div className="flex-1">
+                    <Label className="text-sm">Status Updates</Label>
+                    <p className="text-xs sm:text-sm text-muted-foreground mt-0.5">
                       Notify when posts you engaged with change status
                     </p>
                   </div>
@@ -494,15 +586,16 @@ export default function Profile() {
                     onCheckedChange={(checked) => 
                       updateAlertPreferences({ status_updates: checked })
                     }
+                    className="flex-shrink-0"
                   />
                 </div>
 
                 <Separator />
 
-                <div className="flex items-center justify-between">
-                  <div>
-                    <Label>Weekly Digest</Label>
-                    <p className="text-sm text-muted-foreground">
+                <div className="flex items-center justify-between gap-4">
+                  <div className="flex-1">
+                    <Label className="text-sm">Weekly Digest</Label>
+                    <p className="text-xs sm:text-sm text-muted-foreground mt-0.5">
                       Receive a summary of activity in your followed topics
                     </p>
                   </div>
@@ -511,6 +604,7 @@ export default function Profile() {
                     onCheckedChange={(checked) => 
                       updateAlertPreferences({ weekly_digest: checked })
                     }
+                    className="flex-shrink-0"
                   />
                 </div>
               </CardContent>

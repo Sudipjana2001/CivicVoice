@@ -55,7 +55,7 @@ export function CredibilityBadge({ badge }: CredibilityBadgeProps) {
             <span className="font-medium">{config.label}</span>
           </div>
         </TooltipTrigger>
-        <TooltipContent side="top" className="max-w-xs">
+        <TooltipContent side="bottom" align="start" className="max-w-xs z-[9999]">
           <div className="space-y-1">
             <p className="font-medium">{config.label}</p>
             <p className="text-xs text-muted-foreground">{config.description}</p>

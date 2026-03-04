@@ -7,8 +7,6 @@ export type Json =
   | Json[]
 
 export type Database = {
-  // Allows to automatically instantiate createClient with right options
-  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
     PostgrestVersion: "14.1"
   }
@@ -87,6 +85,48 @@ export type Database = {
           },
         ]
       }
+      alerts: {
+        Row: {
+          id: string
+          recipient_anonymous_id: string
+          type: string
+          title: string
+          description: string
+          read: boolean
+          incident_id: string | null
+          topic_type: string | null
+          topic_value: string | null
+          topic_label: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          recipient_anonymous_id: string
+          type: string
+          title: string
+          description: string
+          read?: boolean
+          incident_id?: string | null
+          topic_type?: string | null
+          topic_value?: string | null
+          topic_label?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          recipient_anonymous_id?: string
+          type?: string
+          title?: string
+          description?: string
+          read?: boolean
+          incident_id?: string | null
+          topic_type?: string | null
+          topic_value?: string | null
+          topic_label?: string | null
+          created_at?: string
+        }
+        Relationships: []
+      }
       comments: {
         Row: {
           anonymous_id: string
@@ -146,6 +186,99 @@ export type Database = {
           },
         ]
       }
+      inbox_messages: {
+        Row: {
+          id: string
+          recipient_anonymous_id: string
+          sender_type: string
+          sender_label: string
+          subject: string
+          preview: string
+          content: string
+          related_post_id: string | null
+          read: boolean
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          recipient_anonymous_id: string
+          sender_type: string
+          sender_label: string
+          subject: string
+          preview: string
+          content: string
+          related_post_id?: string | null
+          read?: boolean
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          recipient_anonymous_id?: string
+          sender_type?: string
+          sender_label?: string
+          subject?: string
+          preview?: string
+          content?: string
+          related_post_id?: string | null
+          read?: boolean
+          created_at?: string
+        }
+        Relationships: []
+      }
+      posts: {
+        Row: {
+          id: string
+          anonymous_id: string
+          content: string
+          category: string
+          severity: string
+          evidence_type: string | null
+          location: string | null
+          image_url: string | null
+          credible_votes: number
+          suspicious_votes: number
+          comment_count: number
+          status: string
+          self_destruct_at: string | null
+          created_at: string
+          user_id: string | null
+        }
+        Insert: {
+          id?: string
+          anonymous_id?: string
+          content: string
+          category: string
+          severity: string
+          evidence_type?: string | null
+          location?: string | null
+          image_url?: string | null
+          credible_votes?: number
+          suspicious_votes?: number
+          comment_count?: number
+          status?: string
+          self_destruct_at?: string | null
+          created_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          id?: string
+          anonymous_id?: string
+          content?: string
+          category?: string
+          severity?: string
+          evidence_type?: string | null
+          location?: string | null
+          image_url?: string | null
+          credible_votes?: number
+          suspicious_votes?: number
+          comment_count?: number
+          status?: string
+          self_destruct_at?: string | null
+          created_at?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           anonymous_id: string
@@ -184,6 +317,38 @@ export type Database = {
           user_id?: string | null
         }
         Relationships: []
+      }
+      votes: {
+        Row: {
+          id: string
+          post_id: string
+          voter_id: string
+          vote_type: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          post_id: string
+          voter_id: string
+          vote_type: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          post_id?: string
+          voter_id?: string
+          vote_type?: string
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "votes_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: false
+            referencedRelation: "posts"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {

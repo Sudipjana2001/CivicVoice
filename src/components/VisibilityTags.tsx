@@ -50,7 +50,7 @@ export function VisibilityTags({ tags }: VisibilityTagsProps) {
                   {config.label}
                 </Badge>
               </TooltipTrigger>
-              <TooltipContent side="top" className="max-w-xs">
+              <TooltipContent side="bottom" className="max-w-xs z-[9999]">
                 <p className="text-xs">{config.description}</p>
               </TooltipContent>
             </Tooltip>

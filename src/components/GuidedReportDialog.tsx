@@ -27,14 +27,16 @@ import { Input } from '@/components/ui/input';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Progress } from '@/components/ui/progress';
 import { CATEGORIES, SEVERITY_LEVELS, EVIDENCE_TYPES, getAnonymousSession } from '@/lib/anonymity';
-import type { Category, Severity, EvidenceType, Post } from '@/lib/anonymity';
+import type { Category, Severity, EvidenceType } from '@/lib/anonymity';
 import type { SelfDestructOption } from '@/lib/types';
 import { AnonymityHealthIndicator } from './AnonymityHealthIndicator';
 import { SelfDestructOptions } from './SelfDestructOptions';
+import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { useAuth } from '@/hooks/useAuth';
 
 interface GuidedReportDialogProps {
-  onPostCreated: (post: Post) => void;
+  onPostCreated: () => void;
 }
 
 type Step = 'what' | 'when' | 'where' | 'evidence' | 'review';
@@ -64,6 +66,7 @@ export function GuidedReportDialog({ onPostCreated }: GuidedReportDialogProps) {
   const [deleteMediaOnly, setDeleteMediaOnly] = useState(false);
 
   const session = getAnonymousSession();
+  const { user } = useAuth();
 
   const stepIndex = STEPS.findIndex(s => s.id === currentStep);
   const progress = ((stepIndex + 1) / STEPS.length) * 100;
@@ -99,28 +102,47 @@ export function GuidedReportDialog({ onPostCreated }: GuidedReportDialogProps) {
     }
   };
 
-  const handleSubmit = () => {
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleSubmit = async () => {
     if (!content.trim()) {
       toast.error('Please provide a description of the incident');
       return;
     }
 
-    const newPost: Post = {
-      id: crypto.randomUUID(),
-      anonymousId: session.id,
-      content: content.trim(),
-      category,
-      severity,
-      evidenceType: evidenceType || undefined,
-      location: location.trim() || undefined,
-      imageUrl: imageUrl.trim() || undefined,
-      createdAt: new Date(),
-      credibleVotes: 0,
-      suspiciousVotes: 0,
-      commentCount: 0,
-    };
+    setIsSubmitting(true);
 
-    onPostCreated(newPost);
+    // Calculate self_destruct_at if set
+    let selfDestructAt: string | null = null;
+    if (selfDestruct) {
+      const date = new Date();
+      date.setDate(date.getDate() + selfDestruct);
+      selfDestructAt = date.toISOString();
+    }
+
+    const { error } = await supabase
+      .from('posts')
+      .insert({
+        anonymous_id: session.id,
+        user_id: user?.id || null,
+        content: content.trim(),
+        category,
+        severity,
+        evidence_type: evidenceType || null,
+        location: location.trim() || null,
+        image_url: imageUrl.trim() || null,
+        self_destruct_at: selfDestructAt,
+      });
+
+    setIsSubmitting(false);
+
+    if (error) {
+      console.error('Error creating post:', error);
+      toast.error('Failed to submit report. Please try again.');
+      return;
+    }
+
+    onPostCreated();
     resetForm();
     setOpen(false);
 
@@ -307,18 +329,107 @@ export function GuidedReportDialog({ onPostCreated }: GuidedReportDialogProps) {
               </RadioGroup>
             </div>
 
-            {(evidenceType === 'photo' || evidenceType === 'video') && (
-              <div className="space-y-2">
-                <Label htmlFor="imageUrl">Media URL (Optional)</Label>
-                <Input
-                  id="imageUrl"
-                  placeholder="https://..."
-                  value={imageUrl}
-                  onChange={(e) => setImageUrl(e.target.value)}
-                  className="bg-muted/50 border-border"
-                />
+            {(evidenceType === 'photo' || evidenceType === 'video' || evidenceType === 'document') && (
+              <div className="space-y-3">
+                <Label>Upload Evidence (Optional)</Label>
+                
+                {/* File upload */}
+                <div className="space-y-2">
+                  <input
+                    type="file"
+                    id="evidence-file"
+                    className="hidden"
+                    accept={
+                      evidenceType === 'photo' ? 'image/*' :
+                      evidenceType === 'video' ? 'video/*' :
+                      '.pdf,.doc,.docx,.txt'
+                    }
+                    onChange={async (e) => {
+                      const file = e.target.files?.[0];
+                      if (!file) return;
+
+                      // Size check (10MB max)
+                      if (file.size > 10 * 1024 * 1024) {
+                        toast.error('File too large. Maximum size is 10MB.');
+                        return;
+                      }
+
+                      try {
+                        let uploadFile: File | Blob = file;
+
+                        // Strip EXIF from images before upload
+                        if (file.type.startsWith('image/')) {
+                          const { stripImageMetadata } = await import('@/lib/crypto');
+                          uploadFile = await stripImageMetadata(file);
+                        }
+
+                        const fileName = `${crypto.randomUUID()}_${file.name.replace(/[^a-zA-Z0-9._-]/g, '')}`;
+                        const { data, error } = await supabase.storage
+                          .from('evidence')
+                          .upload(fileName, uploadFile, {
+                            cacheControl: '3600',
+                            upsert: false,
+                          });
+
+                        if (error) {
+                          // If bucket doesn't exist, fall back to URL input
+                          toast.error('Upload failed. You can paste a URL instead.');
+                          console.error('Upload error:', error);
+                          return;
+                        }
+
+                        const { data: urlData } = supabase.storage
+                          .from('evidence')
+                          .getPublicUrl(data.path);
+
+                        setImageUrl(urlData.publicUrl);
+                        toast.success('File uploaded successfully');
+                      } catch (err) {
+                        console.error('Upload error:', err);
+                        toast.error('Upload failed. You can paste a URL instead.');
+                      }
+                    }}
+                  />
+                  
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full gap-2"
+                    onClick={() => document.getElementById('evidence-file')?.click()}
+                  >
+                    <Camera className="h-4 w-4" />
+                    Choose File
+                  </Button>
+
+                  {imageUrl && (
+                    <div className="rounded-lg border border-border/50 p-2 bg-muted/30">
+                      {evidenceType === 'photo' ? (
+                        <img src={imageUrl} alt="Uploaded evidence" className="w-full h-32 object-cover rounded" />
+                      ) : (
+                        <p className="text-xs text-muted-foreground truncate">📎 {imageUrl}</p>
+                      )}
+                    </div>
+                  )}
+
+                  <div className="relative">
+                    <div className="absolute inset-0 flex items-center">
+                      <span className="w-full border-t border-border/50" />
+                    </div>
+                    <div className="relative flex justify-center text-xs">
+                      <span className="bg-background px-2 text-muted-foreground">or paste URL</span>
+                    </div>
+                  </div>
+
+                  <Input
+                    placeholder="https://..."
+                    value={imageUrl}
+                    onChange={(e) => setImageUrl(e.target.value)}
+                    className="bg-muted/50 border-border"
+                  />
+                </div>
+                
                 <p className="text-xs text-muted-foreground">
-                  ⚠️ Faces and sensitive information will be automatically blurred before publishing.
+                  ⚠️ Image metadata (EXIF, GPS) is automatically stripped before publishing. Max 10MB.
                 </p>
               </div>
             )}
@@ -464,9 +575,9 @@ export function GuidedReportDialog({ onPostCreated }: GuidedReportDialogProps) {
           </Button>
 
           {currentStep === 'review' ? (
-            <Button onClick={handleSubmit} className="bg-primary hover:bg-primary/90 gap-2">
+            <Button onClick={handleSubmit} disabled={isSubmitting} className="bg-primary hover:bg-primary/90 gap-2">
               <Shield className="h-4 w-4" />
-              Submit Report
+              {isSubmitting ? 'Submitting...' : 'Submit Report'}
             </Button>
           ) : (
             <Button

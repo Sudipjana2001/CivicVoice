@@ -78,7 +78,7 @@ export function IncidentStatusBadge({ status, size = 'sm', showLabel = true }: I
             {showLabel && <span className="font-medium">{config.label}</span>}
           </div>
         </TooltipTrigger>
-        <TooltipContent side="top">
+        <TooltipContent side="bottom" className="z-[9999]">
           <p>{config.description}</p>
         </TooltipContent>
       </Tooltip>

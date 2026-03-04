@@ -1,4 +1,5 @@
 import { useState, useMemo, useRef, useEffect } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Header } from '@/components/Header';
 import { FilterButton } from '@/components/FilterButton';
 import { EnhancedPostCard } from '@/components/EnhancedPostCard';
@@ -7,23 +8,49 @@ import { Footer } from '@/components/Footer';
 import { LegalDisclaimer } from '@/components/LegalDisclaimer';
 import { TopicFollowing } from '@/components/TopicFollowing';
 import { CommentsCard } from '@/components/CommentsCard';
-import { generateMockPosts } from '@/lib/anonymity';
+import { PostService } from '@/services/PostService';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/hooks/useAuth';
 import type { Post, Category, Severity } from '@/lib/anonymity';
 import type { FollowedTopic } from '@/lib/types';
-import { TrendingUp, Clock } from 'lucide-react';
+import { TrendingUp, Clock, Loader2, LogIn } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { Link } from 'react-router-dom';
 
 type SortOption = 'recent' | 'trending';
 
+const postService = PostService.getInstance();
+
 export default function Index() {
   const isMobile = useIsMobile();
-  const [posts, setPosts] = useState<Post[]>(generateMockPosts());
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
+
+  const { data: posts = [], isLoading, error } = useQuery({
+    queryKey: ['posts'],
+    queryFn: () => postService.fetchAll(),
+  });
+
   const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
   const [selectedSeverity, setSelectedSeverity] = useState<Severity | null>(null);
   const [sortBy, setSortBy] = useState<SortOption>('recent');
   const [followedTopics, setFollowedTopics] = useState<FollowedTopic[]>([]);
   const [selectedPostId, setSelectedPostId] = useState<string | null>(null);
+
+  // Real-time subscription for new posts
+  useEffect(() => {
+    const channel = supabase
+      .channel('posts-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'posts' }, () => {
+        queryClient.invalidateQueries({ queryKey: ['posts'] });
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [queryClient]);
 
   const filteredPosts = useMemo(() => {
     let result = [...posts];
@@ -47,8 +74,8 @@ export default function Index() {
     return result;
   }, [posts, selectedCategory, selectedSeverity, sortBy]);
 
-  const handlePostCreated = (newPost: Post) => {
-    setPosts(prev => [newPost, ...prev]);
+  const handlePostCreated = () => {
+    queryClient.invalidateQueries({ queryKey: ['posts'] });
   };
 
   const handleFollow = (topic: FollowedTopic) => {
@@ -153,12 +180,30 @@ export default function Index() {
             />
           </div>
 
-          <GuidedReportDialog onPostCreated={handlePostCreated} />
+          {user ? (
+            <GuidedReportDialog onPostCreated={handlePostCreated} />
+          ) : (
+            <Link to="/auth">
+              <Button variant="outline" size="sm" className="gap-2">
+                <LogIn className="h-4 w-4" />
+                Sign in to Report
+              </Button>
+            </Link>
+          )}
         </div>
 
         {/* Posts */}
         <div className="max-w-4xl mx-auto space-y-4">
-          {filteredPosts.length > 0 ? (
+          {isLoading ? (
+            <div className="text-center py-12 glass-card max-w-2xl mx-auto">
+              <Loader2 className="h-8 w-8 animate-spin text-primary mx-auto mb-2" />
+              <p className="text-muted-foreground">Loading reports...</p>
+            </div>
+          ) : error ? (
+            <div className="text-center py-12 glass-card max-w-2xl mx-auto">
+              <p className="text-destructive">Failed to load reports. Please try again.</p>
+            </div>
+          ) : filteredPosts.length > 0 ? (
             filteredPosts.map((post) => (
               <PostWithComments
                 key={post.id}
@@ -171,7 +216,9 @@ export default function Index() {
           ) : (
             <div className="text-center py-12 glass-card max-w-2xl mx-auto">
               <p className="text-muted-foreground">
-                No reports match your filters. Try adjusting your criteria.
+                {posts.length === 0 
+                  ? 'No reports yet. Be the first to report an incident!'
+                  : 'No reports match your filters. Try adjusting your criteria.'}
               </p>
             </div>
           )}
