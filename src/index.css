@@ -276,6 +276,14 @@
     animation: cv-media-enter 260ms cubic-bezier(0.22, 1, 0.36, 1) both;
   }
 
+  .cv-media-shell {
+    background-position: center;
+    background-repeat: no-repeat;
+    background-size: cover;
+    filter: blur(16px);
+    transform: scale(1.06);
+  }
+
   .cv-shimmer {
     background: linear-gradient(
       110deg,
@@ -310,6 +318,11 @@
   .cv-scroll-in-visible {
     opacity: 1;
     transform: translateY(0) scale(1);
+  }
+
+  .cv-content-auto {
+    content-visibility: auto;
+    contain-intrinsic-size: 420px;
   }
 }
 

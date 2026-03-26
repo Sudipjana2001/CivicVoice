@@ -234,6 +234,71 @@ export type Database = {
         }
         Relationships: []
       }
+      media_assets: {
+        Row: {
+          card_path: string | null
+          created_at: string
+          duration_ms: number | null
+          full_path: string | null
+          height: number | null
+          id: string
+          kind: string
+          lqip_data_url: string | null
+          mime_type: string | null
+          original_path: string
+          post_id: string
+          poster_path: string | null
+          preview_path: string | null
+          thumb_path: string | null
+          updated_at: string
+          width: number | null
+        }
+        Insert: {
+          card_path?: string | null
+          created_at?: string
+          duration_ms?: number | null
+          full_path?: string | null
+          height?: number | null
+          id?: string
+          kind: string
+          lqip_data_url?: string | null
+          mime_type?: string | null
+          original_path: string
+          post_id: string
+          poster_path?: string | null
+          preview_path?: string | null
+          thumb_path?: string | null
+          updated_at?: string
+          width?: number | null
+        }
+        Update: {
+          card_path?: string | null
+          created_at?: string
+          duration_ms?: number | null
+          full_path?: string | null
+          height?: number | null
+          id?: string
+          kind?: string
+          lqip_data_url?: string | null
+          mime_type?: string | null
+          original_path?: string
+          post_id?: string
+          poster_path?: string | null
+          preview_path?: string | null
+          thumb_path?: string | null
+          updated_at?: string
+          width?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "media_assets_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: true
+            referencedRelation: "posts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       posts: {
         Row: {
           id: string
@@ -411,7 +476,24 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      upsert_post_media_asset: {
+        Args: {
+          p_card_path?: string | null
+          p_duration_ms?: number | null
+          p_full_path?: string | null
+          p_height?: number | null
+          p_kind: string
+          p_lqip_data_url?: string | null
+          p_mime_type?: string | null
+          p_original_path: string
+          p_post_id: string
+          p_poster_path?: string | null
+          p_preview_path?: string | null
+          p_thumb_path?: string | null
+          p_width?: number | null
+        }
+        Returns: Database["public"]["Tables"]["media_assets"]["Row"]
+      }
     }
     Enums: {
       [_ in never]: never

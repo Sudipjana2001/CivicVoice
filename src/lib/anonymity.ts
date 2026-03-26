@@ -80,6 +80,23 @@ export const EVIDENCE_TYPES = [
 ] as const;
 
 export type EvidenceType = typeof EVIDENCE_TYPES[number]['id'];
+export type MediaKind = 'image' | 'video' | 'document' | 'other';
+
+export interface MediaAsset {
+  id?: string;
+  kind: MediaKind;
+  originalPath: string;
+  thumbPath?: string;
+  cardPath?: string;
+  fullPath?: string;
+  posterPath?: string;
+  previewPath?: string;
+  width?: number;
+  height?: number;
+  durationMs?: number;
+  mimeType?: string;
+  lqipDataUrl?: string;
+}
 
 // Post interface
 export interface Post {
@@ -101,4 +118,5 @@ export interface Post {
   userId?: string;
   status?: string;
   selfDestructAt?: Date;
+  mediaAsset?: MediaAsset;
 }

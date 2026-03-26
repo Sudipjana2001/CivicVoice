@@ -1,5 +1,21 @@
 import { supabase } from '@/integrations/supabase/client';
-import type { Post, Category, Severity, EvidenceType } from '@/lib/anonymity';
+import type { Post, Category, Severity, EvidenceType, MediaAsset, MediaKind } from '@/lib/anonymity';
+
+interface MediaAssetRow {
+  id: string;
+  kind: string;
+  original_path: string;
+  thumb_path: string | null;
+  card_path: string | null;
+  full_path: string | null;
+  poster_path: string | null;
+  preview_path: string | null;
+  width: number | null;
+  height: number | null;
+  duration_ms: number | null;
+  mime_type: string | null;
+  lqip_data_url: string | null;
+}
 
 interface PostRow {
   id: string;
@@ -20,6 +36,7 @@ interface PostRow {
   status: string;
   self_destruct_at: string | null;
   user_id: string | null;
+  media_assets?: MediaAssetRow | MediaAssetRow[] | null;
 }
 
 /**
@@ -40,6 +57,23 @@ export class PostService {
 
   /** Map a Supabase row to the local Post type. */
   mapRowToPost(row: PostRow): Post & { userId?: string } {
+    const mediaAssetRow = Array.isArray(row.media_assets) ? row.media_assets[0] : row.media_assets;
+    const mediaAsset: MediaAsset | undefined = mediaAssetRow ? {
+      id: mediaAssetRow.id,
+      kind: mediaAssetRow.kind as MediaKind,
+      originalPath: mediaAssetRow.original_path,
+      thumbPath: mediaAssetRow.thumb_path || undefined,
+      cardPath: mediaAssetRow.card_path || undefined,
+      fullPath: mediaAssetRow.full_path || undefined,
+      posterPath: mediaAssetRow.poster_path || undefined,
+      previewPath: mediaAssetRow.preview_path || undefined,
+      width: mediaAssetRow.width || undefined,
+      height: mediaAssetRow.height || undefined,
+      durationMs: mediaAssetRow.duration_ms || undefined,
+      mimeType: mediaAssetRow.mime_type || undefined,
+      lqipDataUrl: mediaAssetRow.lqip_data_url || undefined,
+    } : undefined;
+
     return {
       id: row.id,
       anonymousId: row.anonymous_id,
@@ -59,6 +93,7 @@ export class PostService {
       userId: row.user_id || undefined,
       status: row.status,
       selfDestructAt: row.self_destruct_at ? new Date(row.self_destruct_at) : undefined,
+      mediaAsset,
     };
   }
 
@@ -66,7 +101,7 @@ export class PostService {
   async fetchAll(): Promise<Post[]> {
     const { data, error } = await supabase
       .from('posts')
-      .select('*')
+      .select('*, media_assets(*)')
       .order('created_at', { ascending: false });
 
     if (error) throw error;
@@ -77,7 +112,7 @@ export class PostService {
   async fetchPage(limit: number, offset: number): Promise<{ posts: Post[]; hasMore: boolean }> {
     const { data, error } = await supabase
       .from('posts')
-      .select('*')
+      .select('*, media_assets(*)')
       .order('created_at', { ascending: false })
       .range(offset, offset + limit - 1);
 
@@ -94,7 +129,7 @@ export class PostService {
   async fetchById(id: string): Promise<Post | null> {
     const { data, error } = await supabase
       .from('posts')
-      .select('*')
+      .select('*, media_assets(*)')
       .eq('id', id)
       .maybeSingle();
 
@@ -106,7 +141,7 @@ export class PostService {
   async fetchByUserId(userId: string): Promise<Post[]> {
     const { data, error } = await supabase
       .from('posts')
-      .select('*')
+      .select('*, media_assets(*)')
       .eq('user_id', userId)
       .order('created_at', { ascending: false });
 

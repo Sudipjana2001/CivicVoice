@@ -115,6 +115,7 @@ export function applyPrivacyHeaders(): void {
     "font-src 'self' https://fonts.gstatic.com",
     "img-src 'self' data: blob: https://*.supabase.co https://*.basemaps.cartocdn.com https://*.tile.openstreetmap.org https://unpkg.com",
     "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://nominatim.openstreetmap.org https://*.vercel-insights.com",
+    "worker-src 'self'",
     "frame-src 'none'",
     "object-src 'none'",
     "base-uri 'self'",

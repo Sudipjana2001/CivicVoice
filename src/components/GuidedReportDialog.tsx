@@ -29,6 +29,11 @@ import { Progress } from '@/components/ui/progress';
 import { CATEGORIES, SEVERITY_LEVELS, EVIDENCE_TYPES } from '@/lib/anonymity';
 import type { Category, Severity, EvidenceType } from '@/lib/anonymity';
 import type { SelfDestructOption } from '@/lib/types';
+import {
+  mediaKindFromEvidenceType,
+  revokePreparedEvidencePreview,
+  type PreparedEvidenceUpload,
+} from '@/lib/media';
 import { formatIncidentTiming } from '@/lib/postTiming';
 import { AnonymityHealthIndicator } from './AnonymityHealthIndicator';
 import { SelfDestructOptions } from './SelfDestructOptions';
@@ -67,8 +72,8 @@ export function GuidedReportDialog({ onPostCreated }: GuidedReportDialogProps) {
   const [incidentTime, setIncidentTime] = useState('');
   const [location, setLocation] = useState('');
   const [evidenceType, setEvidenceType] = useState<EvidenceType | ''>('');
-  const [evidencePath, setEvidencePath] = useState('');
   const [evidencePreviewUrl, setEvidencePreviewUrl] = useState('');
+  const [uploadedEvidence, setUploadedEvidence] = useState<PreparedEvidenceUpload | null>(null);
   const [selfDestruct, setSelfDestruct] = useState<SelfDestructOption>(null);
   const [profileAnonymousId, setProfileAnonymousId] = useState<string | null>(null);
 
@@ -107,6 +112,21 @@ export function GuidedReportDialog({ onPostCreated }: GuidedReportDialogProps) {
       cancelled = true;
     };
   }, [user]);
+
+  useEffect(() => {
+    return () => {
+      revokePreparedEvidencePreview(uploadedEvidence);
+    };
+  }, [uploadedEvidence]);
+
+  useEffect(() => {
+    if (!uploadedEvidence) return;
+    if (mediaKindFromEvidenceType(evidenceType) === uploadedEvidence.kind) return;
+
+    revokePreparedEvidencePreview(uploadedEvidence);
+    setUploadedEvidence(null);
+    setEvidencePreviewUrl('');
+  }, [evidenceType, uploadedEvidence]);
 
   const stepIndex = STEPS.findIndex(s => s.id === currentStep);
   const progress = ((stepIndex + 1) / STEPS.length) * 100;
@@ -158,7 +178,7 @@ export function GuidedReportDialog({ onPostCreated }: GuidedReportDialogProps) {
     setIsSubmitting(true);
 
     try {
-      await postService.create({
+      const post = await postService.create({
         content,
         category,
         severity,
@@ -166,9 +186,18 @@ export function GuidedReportDialog({ onPostCreated }: GuidedReportDialogProps) {
         location,
         incidentDate: incidentDate || undefined,
         incidentTime: incidentTime || undefined,
-        imageUrl: evidencePath || undefined,
+        imageUrl: uploadedEvidence?.fullPath || uploadedEvidence?.originalPath || undefined,
         selfDestructDays: selfDestruct,
       });
+
+      if (uploadedEvidence) {
+        try {
+          await evidenceService.attachToPost(post.id, uploadedEvidence);
+        } catch (attachError) {
+          console.error('Error attaching media manifest:', attachError);
+          toast.warning('Report posted, but media optimization metadata could not be attached.');
+        }
+      }
     } catch (error) {
       console.error('Error creating post:', error);
       setIsSubmitting(false);
@@ -195,7 +224,8 @@ export function GuidedReportDialog({ onPostCreated }: GuidedReportDialogProps) {
     setIncidentTime('');
     setLocation('');
     setEvidenceType('');
-    setEvidencePath('');
+    revokePreparedEvidencePreview(uploadedEvidence);
+    setUploadedEvidence(null);
     setEvidencePreviewUrl('');
     setSelfDestruct(null);
     setCurrentStep('what');
@@ -397,17 +427,10 @@ export function GuidedReportDialog({ onPostCreated }: GuidedReportDialogProps) {
                       }
 
                       try {
-                        let uploadFile: File | Blob = file;
-
-                        // Strip EXIF from images before upload
-                        if (file.type.startsWith('image/')) {
-                          const { stripImageMetadata } = await import('@/lib/crypto');
-                          uploadFile = await stripImageMetadata(file);
-                        }
-
-                        const upload = await evidenceService.uploadEvidence(file, uploadFile);
-                        setEvidencePath(upload.path);
-                        setEvidencePreviewUrl(upload.signedUrl);
+                        const upload = await evidenceService.uploadEvidence(file, evidenceType);
+                        revokePreparedEvidencePreview(uploadedEvidence);
+                        setUploadedEvidence(upload);
+                        setEvidencePreviewUrl(upload.previewUrl || '');
                         toast.success('File uploaded successfully');
                       } catch (err) {
                         console.error('Upload error:', err);
@@ -439,7 +462,7 @@ export function GuidedReportDialog({ onPostCreated }: GuidedReportDialogProps) {
                 </div>
                 
                 <p className="text-xs text-muted-foreground">
-                  Files stay private in storage and are shared through signed links. Image metadata is stripped before upload. Max 10MB.
+                  Files stay private in storage and are shared through signed links. Photos now upload optimized feed sizes plus a full version. Max 10MB.
                 </p>
               </div>
             )}

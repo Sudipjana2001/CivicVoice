@@ -293,11 +293,13 @@ export default function Index() {
   // Component to handle post + comments with height sync
   function PostWithComments({ 
     post, 
+    eagerMedia,
     isCommentsOpen, 
     onCommentsClick, 
     onCloseComments 
   }: { 
     post: Post; 
+    eagerMedia: boolean;
     isCommentsOpen: boolean; 
     onCommentsClick: (post: Post) => void; 
     onCloseComments: () => void;
@@ -341,6 +343,7 @@ export default function Index() {
         <div ref={postRef} className="self-start">
           <EnhancedPostCard 
             post={post} 
+            eagerMedia={eagerMedia}
             onCommentsClick={onCommentsClick}
             isCommentsOpen={isCommentsOpen}
           />
@@ -446,6 +449,7 @@ export default function Index() {
                 >
                   <PostWithComments
                     post={post}
+                    eagerMedia={idx < 2}
                     isCommentsOpen={selectedPostId === post.id && !isMobile}
                     onCommentsClick={handleCommentsClick}
                     onCloseComments={handleCloseComments}

@@ -9,6 +9,7 @@ import { SeverityBadge } from '@/components/SeverityBadge';
 import { IncidentStatusBadge } from '@/components/IncidentStatusBadge';
 import { LegalDisclaimer } from '@/components/LegalDisclaimer';
 import { ReportPostButton } from '@/components/ReportPostButton';
+import { ProgressiveMediaPreview } from '@/components/ProgressiveMediaPreview';
 import { PostService } from '@/services/PostService';
 import { VoteService } from '@/services/VoteService';
 import { useAuth } from '@/hooks/useAuth';
@@ -49,7 +50,11 @@ export default function CommentsPage() {
   const [isVoting, setIsVoting] = useState(false);
   const [isEvidenceViewerOpen, setIsEvidenceViewerOpen] = useState(false);
   const [votePulse, setVotePulse] = useState<'credible' | 'suspicious' | null>(null);
-  const [evidenceHref, setEvidenceHref] = useState<string | null>(null);
+  const [evidencePreviewUrl, setEvidencePreviewUrl] = useState<string | null>(null);
+  const [evidencePosterUrl, setEvidencePosterUrl] = useState<string | null>(null);
+  const [evidencePreviewVideoUrl, setEvidencePreviewVideoUrl] = useState<string | null>(null);
+  const [evidenceViewerUrl, setEvidenceViewerUrl] = useState<string | null>(null);
+  const [isEvidenceLoading, setIsEvidenceLoading] = useState(false);
 
   useEffect(() => {
     if (post) {
@@ -73,31 +78,96 @@ export default function CommentsPage() {
   useEffect(() => {
     let cancelled = false;
 
-    const loadEvidenceUrl = async () => {
-      if (!post?.imageUrl) {
-        setEvidenceHref(null);
+    const loadEvidencePreview = async () => {
+      if (!post?.mediaAsset && !post?.imageUrl) {
+        setEvidencePreviewUrl(null);
+        setEvidencePosterUrl(null);
+        setEvidencePreviewVideoUrl(null);
         return;
       }
 
+      if (!user) {
+        setEvidencePreviewUrl(null);
+        setEvidencePosterUrl(null);
+        setEvidencePreviewVideoUrl(null);
+        setIsEvidenceLoading(false);
+        return;
+      }
+
+      setIsEvidenceLoading(true);
+
       try {
-        const url = await evidenceService.resolveEvidenceUrl(post.imageUrl);
+        if (post?.mediaAsset) {
+          const urls = await evidenceService.resolveMediaAssetUrls(post.mediaAsset, false);
+          if (!cancelled) {
+            setEvidencePreviewUrl(urls.cardUrl ?? urls.thumbUrl ?? urls.posterUrl ?? null);
+            setEvidencePosterUrl(urls.posterUrl ?? urls.cardUrl ?? urls.thumbUrl ?? null);
+            setEvidencePreviewVideoUrl(urls.previewUrl ?? null);
+          }
+          return;
+        }
+
+        const url = post?.imageUrl ? await evidenceService.resolveEvidenceUrl(post.imageUrl) : null;
         if (!cancelled) {
-          setEvidenceHref(url);
+          setEvidencePreviewUrl(url);
+          setEvidencePosterUrl(url);
+          setEvidencePreviewVideoUrl(null);
         }
       } catch (error) {
         console.error('Evidence error:', error);
         if (!cancelled) {
-          setEvidenceHref(null);
+          setEvidencePreviewUrl(null);
+          setEvidencePosterUrl(null);
+          setEvidencePreviewVideoUrl(null);
+        }
+      } finally {
+        if (!cancelled) {
+          setIsEvidenceLoading(false);
         }
       }
     };
 
-    loadEvidenceUrl();
+    loadEvidencePreview();
 
     return () => {
       cancelled = true;
     };
-  }, [post?.imageUrl]);
+  }, [post?.imageUrl, post?.mediaAsset, user]);
+
+  useEffect(() => {
+    if (!isEvidenceViewerOpen || (!post?.mediaAsset && !post?.imageUrl)) return;
+    if (!user) return;
+
+    let cancelled = false;
+
+    const loadViewerUrl = async () => {
+      try {
+        if (post?.mediaAsset) {
+          const urls = await evidenceService.resolveMediaAssetUrls(post.mediaAsset, true);
+          if (!cancelled) {
+            setEvidenceViewerUrl(urls.fullUrl ?? urls.originalUrl ?? urls.cardUrl ?? urls.thumbUrl ?? null);
+          }
+          return;
+        }
+
+        const url = post?.imageUrl ? await evidenceService.resolveEvidenceUrl(post.imageUrl) : null;
+        if (!cancelled) {
+          setEvidenceViewerUrl(url);
+        }
+      } catch (error) {
+        console.error('Evidence viewer error:', error);
+        if (!cancelled) {
+          setEvidenceViewerUrl(null);
+        }
+      }
+    };
+
+    loadViewerUrl();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isEvidenceViewerOpen, post?.imageUrl, post?.mediaAsset, user]);
 
   if (isLoading) {
     return (
@@ -163,6 +233,16 @@ export default function CommentsPage() {
   const EvidenceIcon = post.evidenceType ? evidenceIconMap[post.evidenceType] : null;
   const incidentTiming = formatIncidentTiming(post);
   const status = (post.status ?? 'submitted') as IncidentStatus;
+  const hasEvidence = Boolean(post.mediaAsset || post.imageUrl);
+  const shouldRenderEvidenceHero = hasEvidence && (isEvidenceLoading || Boolean(evidencePreviewUrl || evidencePosterUrl || evidencePreviewVideoUrl));
+  const evidenceKind = post.mediaAsset?.kind
+    ?? (post.evidenceType === 'photo'
+      ? 'image'
+      : post.evidenceType === 'video'
+        ? 'video'
+        : post.evidenceType === 'document'
+          ? 'document'
+          : 'other');
 
   return (
     <div className="min-h-screen bg-background">
@@ -180,16 +260,27 @@ export default function CommentsPage() {
       <div className="p-4">
         <Card className="glass-card overflow-hidden mb-4">
           <CardContent className="p-0">
-            {evidenceHref && (
+            {shouldRenderEvidenceHero && (
               <div className="relative h-48 overflow-hidden">
-                {post.evidenceType === 'photo' ? (
-                  <button type="button" onClick={() => setIsEvidenceViewerOpen(true)} className="block w-full h-full">
-                    <img
-                      src={evidenceHref}
-                      alt="Evidence"
-                      className="w-full h-full object-cover cursor-zoom-in cv-media-enter"
-                    />
-                  </button>
+                {evidenceKind === 'image' && evidencePreviewUrl ? (
+                  <ProgressiveMediaPreview
+                    alt="Evidence"
+                    eager
+                    kind="image"
+                    lqipDataUrl={post.mediaAsset?.lqipDataUrl ?? null}
+                    onOpen={() => setIsEvidenceViewerOpen(true)}
+                    previewUrl={evidencePreviewUrl}
+                  />
+                ) : evidenceKind === 'video' && (evidencePreviewVideoUrl || evidencePosterUrl) ? (
+                  <ProgressiveMediaPreview
+                    alt="Evidence video preview"
+                    eager
+                    kind="video"
+                    lqipDataUrl={post.mediaAsset?.lqipDataUrl ?? null}
+                    onOpen={() => setIsEvidenceViewerOpen(true)}
+                    posterUrl={evidencePosterUrl}
+                    previewUrl={evidencePreviewVideoUrl}
+                  />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center bg-muted/40">
                     <div className="text-center space-y-2">
@@ -238,7 +329,7 @@ export default function CommentsPage() {
                 <span className="anonymous-id text-xs font-medium">{post.anonymousId}</span>
               </div>
 
-              {post.imageUrl && !evidenceHref && (
+              {hasEvidence && !isEvidenceLoading && !evidencePreviewUrl && !evidencePosterUrl && !evidencePreviewVideoUrl && (
                 <div className="rounded-lg border border-border/50 bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
                   {user
                     ? 'Private evidence is attached, but the temporary access link is unavailable right now.'
@@ -351,39 +442,39 @@ export default function CommentsPage() {
             <DialogTitle>Evidence Viewer</DialogTitle>
           </DialogHeader>
           <div className="w-full max-h-[75vh] overflow-auto">
-            {post.evidenceType === 'photo' && evidenceHref && (
-              <img src={evidenceHref} alt="Evidence full view" className="w-full h-auto rounded-md cv-media-enter" />
+            {post.evidenceType === 'photo' && evidenceViewerUrl && (
+              <img src={evidenceViewerUrl} alt="Evidence full view" className="w-full h-auto rounded-md cv-media-enter" />
             )}
-            {post.evidenceType === 'video' && evidenceHref && (
-              <video controls className="w-full rounded-md cv-media-enter" src={evidenceHref}>
+            {post.evidenceType === 'video' && evidenceViewerUrl && (
+              <video controls className="w-full rounded-md cv-media-enter" poster={evidencePosterUrl ?? undefined} src={evidenceViewerUrl}>
                 Your browser cannot play this video.
               </video>
             )}
-            {post.evidenceType === 'document' && evidenceHref && (
+            {post.evidenceType === 'document' && evidenceViewerUrl && (
               <div className="space-y-3 cv-media-enter">
                 <p className="text-sm text-muted-foreground">
                   Documents open in a separate tab so CivicVoice does not embed third-party viewers directly.
                 </p>
                 <Button asChild>
-                  <a href={evidenceHref} target="_blank" rel="noreferrer">
+                  <a href={evidenceViewerUrl} target="_blank" rel="noreferrer">
                     Open document
                   </a>
                 </Button>
               </div>
             )}
-            {post.evidenceType && post.evidenceType !== 'photo' && post.evidenceType !== 'video' && post.evidenceType !== 'document' && evidenceHref && (
+            {post.evidenceType && post.evidenceType !== 'photo' && post.evidenceType !== 'video' && post.evidenceType !== 'document' && evidenceViewerUrl && (
               <div className="space-y-3 cv-media-enter">
                 <p className="text-sm text-muted-foreground">
                   This attachment opens in a separate tab to avoid embedding unknown content inside the app.
                 </p>
                 <Button asChild>
-                  <a href={evidenceHref} target="_blank" rel="noreferrer">
+                  <a href={evidenceViewerUrl} target="_blank" rel="noreferrer">
                     Open attachment
                   </a>
                 </Button>
               </div>
             )}
-            {post.imageUrl && !evidenceHref && (
+            {hasEvidence && !evidenceViewerUrl && (
               <p className="text-sm text-muted-foreground">
                 This evidence is unavailable, expired, or hidden because it does not meet the app&apos;s current privacy rules.
               </p>
