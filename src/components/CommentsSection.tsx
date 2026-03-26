@@ -59,7 +59,7 @@ export function CommentsSection({ postId, initialCount, isFullPage }: CommentsSe
       const data = await commentService.create(postId, newComment);
       setComments(prev => [data, ...prev]);
       setNewComment('');
-      toast.success('Comment posted anonymously');
+      toast.success('Comment posted under your public pseudonym');
     } catch (error) {
       console.error('Error submitting comment:', error);
       toast.error('Failed to post comment');

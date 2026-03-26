@@ -20,7 +20,7 @@ export default function InboxPage() {
               Secure Anonymous Inbox
             </h1>
             <p className="text-muted-foreground mt-1">
-              Receive one-way messages from verified NGOs, journalists, and moderators.
+              Review one-way messages from organizations, journalists, and moderators on the platform.
             </p>
           </div>
 
@@ -30,26 +30,26 @@ export default function InboxPage() {
               <div className="flex items-start gap-3">
                 <Shield className="h-5 w-5 text-primary flex-shrink-0 mt-0.5" />
                 <div className="space-y-2">
-                  <h3 className="font-medium">Your Privacy is Protected</h3>
-                  <ul className="text-sm text-muted-foreground space-y-1">
-                    <li className="flex items-center gap-2">
-                      <Lock className="h-3 w-3" />
-                      Messages are encrypted end-to-end
-                    </li>
-                    <li className="flex items-center gap-2">
-                      <Lock className="h-3 w-3" />
-                      Senders cannot see your identity or contact information
-                    </li>
-                    <li className="flex items-center gap-2">
-                      <Lock className="h-3 w-3" />
-                      Replies are disabled by default - you control if/when to respond
-                    </li>
-                    <li className="flex items-center gap-2">
-                      <Lock className="h-3 w-3" />
-                      All senders are verified before being allowed to contact reporters
-                    </li>
-                  </ul>
-                </div>
+                    <h3 className="font-medium">Your Privacy is Protected</h3>
+                    <ul className="text-sm text-muted-foreground space-y-1">
+                      <li className="flex items-center gap-2">
+                        <Lock className="h-3 w-3" />
+                        Messages stay inside your CivicVoice inbox
+                      </li>
+                      <li className="flex items-center gap-2">
+                        <Lock className="h-3 w-3" />
+                        Senders do not see your email or contact information in the inbox UI
+                      </li>
+                      <li className="flex items-center gap-2">
+                        <Lock className="h-3 w-3" />
+                        Messages are currently one-way
+                      </li>
+                      <li className="flex items-center gap-2">
+                        <Lock className="h-3 w-3" />
+                        Sender labels help you understand who the message is from
+                      </li>
+                    </ul>
+                  </div>
               </div>
             </CardContent>
           </Card>

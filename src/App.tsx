@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
 import { AuthProvider } from "@/hooks/useAuth";
 import { BottomNav } from "@/components/BottomNav";
+import { AppErrorBoundary } from "@/components/AppErrorBoundary";
 import Index from "./pages/Index";
 import Heatmap from "./pages/Heatmap";
 import InboxPage from "./pages/InboxPage";
@@ -36,16 +37,18 @@ const AppRoutes = () => {
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
-    <AuthProvider>
-      <TooltipProvider>
-        <Toaster />
-        <Sonner />
-        <BrowserRouter>
-          <AppRoutes />
-          <BottomNav />
-        </BrowserRouter>
-      </TooltipProvider>
-    </AuthProvider>
+    <AppErrorBoundary>
+      <AuthProvider>
+        <TooltipProvider>
+          <Toaster />
+          <Sonner />
+          <BrowserRouter>
+            <AppRoutes />
+            <BottomNav />
+          </BrowserRouter>
+        </TooltipProvider>
+      </AuthProvider>
+    </AppErrorBoundary>
   </QueryClientProvider>
 );
 

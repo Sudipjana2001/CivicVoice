@@ -12,9 +12,16 @@ export function generateSessionToken(): string {
 
 // Get or create anonymous session
 export function getAnonymousSession(): { id: string; token: string } {
-  const stored = sessionStorage.getItem('civic_anon_session');
-  if (stored) {
-    return JSON.parse(stored);
+  try {
+    const stored = sessionStorage.getItem('civic_anon_session');
+    if (stored) {
+      const parsed = JSON.parse(stored) as Partial<{ id: string; token: string }>;
+      if (typeof parsed.id === 'string' && typeof parsed.token === 'string') {
+        return parsed as { id: string; token: string };
+      }
+    }
+  } catch {
+    sessionStorage.removeItem('civic_anon_session');
   }
   
   const session = {
@@ -22,14 +29,22 @@ export function getAnonymousSession(): { id: string; token: string } {
     token: generateSessionToken(),
   };
   // Use sessionStorage instead of localStorage so data is wiped on browser close
-  sessionStorage.setItem('civic_anon_session', JSON.stringify(session));
+  try {
+    sessionStorage.setItem('civic_anon_session', JSON.stringify(session));
+  } catch {
+    // Ignore storage failures and fall back to the in-memory session object.
+  }
   return session;
 }
 
 // Clear session (for privacy)
 export function clearAnonymousSession(): void {
-  sessionStorage.removeItem('civic_anon_session');
-  localStorage.removeItem('civic_anon_session'); // also clear legacy
+  try {
+    sessionStorage.removeItem('civic_anon_session');
+    localStorage.removeItem('civic_anon_session'); // also clear legacy
+  } catch {
+    // Ignore storage failures during cleanup.
+  }
 }
 
 // Categories
@@ -75,6 +90,8 @@ export interface Post {
   severity: Severity;
   evidenceType?: EvidenceType;
   location?: string;
+  incidentDate?: string;
+  incidentTime?: string;
   imageUrl?: string;
   createdAt: Date;
   credibleVotes: number;
@@ -82,4 +99,6 @@ export interface Post {
   commentCount: number;
   reportCount?: number;
   userId?: string;
+  status?: string;
+  selfDestructAt?: Date;
 }

@@ -63,7 +63,7 @@ export default function Heatmap() {
               Civic Incident Heatmap
             </h1>
             <p className="text-muted-foreground mt-1">
-              Geographic visualization of reported incidents. All locations are approximate to protect reporter privacy.
+              Geographic visualization of reported incidents using the most specific location text each report provides.
             </p>
           </div>
 

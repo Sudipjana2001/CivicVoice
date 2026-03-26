@@ -20,13 +20,23 @@ export function ReportPostButton({ postId, initialCount = 0, className }: Report
   const [isFlagPopping, setIsFlagPopping] = useState(false);
 
   useEffect(() => {
+    setReportCount(initialCount);
+  }, [initialCount]);
+
+  useEffect(() => {
     let isMounted = true;
 
     const loadReportMeta = async () => {
-      try {
-        const meta = await reportService.getMeta(postId, user?.id);
+      if (!user) {
         if (isMounted) {
-          setReportCount(meta.count);
+          setHasReported(false);
+        }
+        return;
+      }
+
+      try {
+        const meta = await reportService.getMeta(postId);
+        if (isMounted) {
           setHasReported(meta.hasReported);
         }
       } catch {

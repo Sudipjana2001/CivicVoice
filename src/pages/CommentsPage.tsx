@@ -1,5 +1,5 @@
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Clock, MapPin, ThumbsUp, ThumbsDown, Share2, Camera, Video, FileText, Users, ExternalLink } from 'lucide-react';
+import { ArrowLeft, Calendar, Clock, MapPin, ThumbsUp, ThumbsDown, Share2, Camera, Video, FileText, Users, ExternalLink } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -7,15 +7,15 @@ import { CommentsSection } from '@/components/CommentsSection';
 import { CategoryBadge } from '@/components/CategoryBadge';
 import { SeverityBadge } from '@/components/SeverityBadge';
 import { IncidentStatusBadge } from '@/components/IncidentStatusBadge';
-import { EvidenceConfidenceScore } from '@/components/EvidenceConfidenceScore';
-import { CredibilityBadge } from '@/components/CredibilityBadge';
 import { LegalDisclaimer } from '@/components/LegalDisclaimer';
 import { ReportPostButton } from '@/components/ReportPostButton';
 import { PostService } from '@/services/PostService';
 import { VoteService } from '@/services/VoteService';
 import { useAuth } from '@/hooks/useAuth';
-import { getAnonymousSession } from '@/lib/anonymity';
-import type { Post, EvidenceType } from '@/lib/anonymity';
+import { EvidenceService } from '@/services/EvidenceService';
+import type { EvidenceType } from '@/lib/anonymity';
+import { formatIncidentTiming } from '@/lib/postTiming';
+import type { IncidentStatus } from '@/lib/types';
 import { formatDistanceToNow } from 'date-fns';
 import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
@@ -23,6 +23,7 @@ import { toast } from 'sonner';
 
 const postService = PostService.getInstance();
 const voteService = VoteService.getInstance();
+const evidenceService = EvidenceService.getInstance();
 
 const evidenceIconMap: Record<EvidenceType, React.ElementType> = {
   photo: Camera,
@@ -35,7 +36,6 @@ export default function CommentsPage() {
   const { postId } = useParams<{ postId: string }>();
   const navigate = useNavigate();
   const { user } = useAuth();
-  const session = getAnonymousSession();
 
   const { data: post, isLoading, error } = useQuery({
     queryKey: ['post', postId],
@@ -49,6 +49,7 @@ export default function CommentsPage() {
   const [isVoting, setIsVoting] = useState(false);
   const [isEvidenceViewerOpen, setIsEvidenceViewerOpen] = useState(false);
   const [votePulse, setVotePulse] = useState<'credible' | 'suspicious' | null>(null);
+  const [evidenceHref, setEvidenceHref] = useState<string | null>(null);
 
   useEffect(() => {
     if (post) {
@@ -59,11 +60,44 @@ export default function CommentsPage() {
 
   useEffect(() => {
     if (post && user) {
-      voteService.getUserVote(post.id, session.token).then(vote => {
-        if (vote) setUserVote(vote);
-      });
+      voteService.getUserVote(post.id)
+        .then(vote => {
+          if (vote) setUserVote(vote);
+        })
+        .catch((error) => {
+          console.error('Error loading vote state:', error);
+        });
     }
-  }, [post, user, session.token]);
+  }, [post, user]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadEvidenceUrl = async () => {
+      if (!post?.imageUrl) {
+        setEvidenceHref(null);
+        return;
+      }
+
+      try {
+        const url = await evidenceService.resolveEvidenceUrl(post.imageUrl);
+        if (!cancelled) {
+          setEvidenceHref(url);
+        }
+      } catch (error) {
+        console.error('Evidence error:', error);
+        if (!cancelled) {
+          setEvidenceHref(null);
+        }
+      }
+    };
+
+    loadEvidenceUrl();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [post?.imageUrl]);
 
   if (isLoading) {
     return (
@@ -113,7 +147,7 @@ export default function CommentsPage() {
 
     try {
       const result = await voteService.toggleVote(
-        post.id, session.token, type
+        post.id, type
       );
       setUserVote(result.newVote);
       setCredibleVotes(result.credibleVotes);
@@ -127,7 +161,8 @@ export default function CommentsPage() {
   };
 
   const EvidenceIcon = post.evidenceType ? evidenceIconMap[post.evidenceType] : null;
-  const evidenceHref = post.imageUrl ?? null;
+  const incidentTiming = formatIncidentTiming(post);
+  const status = (post.status ?? 'submitted') as IncidentStatus;
 
   return (
     <div className="min-h-screen bg-background">
@@ -169,7 +204,7 @@ export default function CommentsPage() {
                 )}
                 <div className="absolute inset-0 bg-gradient-to-t from-card to-transparent pointer-events-none" />
                 <div className="absolute top-2 right-2 bg-card/80 backdrop-blur-sm px-2 py-1 rounded text-xs text-muted-foreground">
-                  Faces auto-blurred
+                  Private evidence
                 </div>
                 <div className="absolute bottom-2 right-2">
                   <Button size="sm" variant="secondary" className="gap-1 h-8" onClick={() => setIsEvidenceViewerOpen(true)}>
@@ -183,8 +218,7 @@ export default function CommentsPage() {
             <div className="p-4 space-y-3">
               {/* Status badges */}
               <div className="flex flex-wrap items-center gap-2">
-                <IncidentStatusBadge status="submitted" size="sm" />
-                <EvidenceConfidenceScore level="medium" size="sm" />
+                <IncidentStatusBadge status={status} size="sm" />
               </div>
 
               {/* Category and severity */}
@@ -202,15 +236,28 @@ export default function CommentsPage() {
               {/* Anonymous ID */}
               <div className="flex items-center gap-2">
                 <span className="anonymous-id text-xs font-medium">{post.anonymousId}</span>
-                <CredibilityBadge badge={{ level: 'new', reportsCount: 1, credibilityScore: 75 }} />
               </div>
 
+              {post.imageUrl && !evidenceHref && (
+                <div className="rounded-lg border border-border/50 bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
+                  {user
+                    ? 'Private evidence is attached, but the temporary access link is unavailable right now.'
+                    : 'Private evidence is attached to this report. Sign in to open it with a temporary access link.'}
+                </div>
+              )}
+
               {/* Time and location */}
-              <div className="flex items-center gap-4 text-xs text-muted-foreground">
+              <div className="flex flex-wrap items-center gap-4 text-xs text-muted-foreground">
                 <span className="flex items-center gap-1">
                   <Clock className="h-3 w-3" />
                   {formatDistanceToNow(post.createdAt, { addSuffix: true })}
                 </span>
+                {incidentTiming && (
+                  <span className="flex items-center gap-1">
+                    <Calendar className="h-3 w-3" />
+                    {incidentTiming}
+                  </span>
+                )}
                 {post.location && (
                   <span className="flex items-center gap-1">
                     <MapPin className="h-3 w-3" />
@@ -253,7 +300,30 @@ export default function CommentsPage() {
                 </div>
 
                 <div className="flex items-center gap-1">
-                  <Button variant="ghost" size="sm" className="px-2 h-8 text-muted-foreground hover:text-foreground cv-interactive">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="px-2 h-8 text-muted-foreground hover:text-foreground cv-interactive"
+                    onClick={async () => {
+                      const shareUrl = `${window.location.origin}/comments/${post.id}`;
+                      const shareText = `${post.content.substring(0, 100)}${post.content.length > 100 ? '...' : ''}`;
+
+                      if (navigator.share) {
+                        try {
+                          await navigator.share({
+                            title: 'CivicVoice Report',
+                            text: shareText,
+                            url: shareUrl,
+                          });
+                        } catch {
+                          // User cancelled share.
+                        }
+                      } else {
+                        await navigator.clipboard.writeText(shareUrl);
+                        toast.success('Link copied to clipboard');
+                      }
+                    }}
+                  >
                     <Share2 className="h-4 w-4" />
                   </Button>
                   <ReportPostButton
@@ -290,10 +360,33 @@ export default function CommentsPage() {
               </video>
             )}
             {post.evidenceType === 'document' && evidenceHref && (
-              <iframe title="Evidence document" src={evidenceHref} className="w-full h-[70vh] rounded-md border cv-media-enter" />
+              <div className="space-y-3 cv-media-enter">
+                <p className="text-sm text-muted-foreground">
+                  Documents open in a separate tab so CivicVoice does not embed third-party viewers directly.
+                </p>
+                <Button asChild>
+                  <a href={evidenceHref} target="_blank" rel="noreferrer">
+                    Open document
+                  </a>
+                </Button>
+              </div>
             )}
             {post.evidenceType && post.evidenceType !== 'photo' && post.evidenceType !== 'video' && post.evidenceType !== 'document' && evidenceHref && (
-              <iframe title="Evidence content" src={evidenceHref} className="w-full h-[70vh] rounded-md border cv-media-enter" />
+              <div className="space-y-3 cv-media-enter">
+                <p className="text-sm text-muted-foreground">
+                  This attachment opens in a separate tab to avoid embedding unknown content inside the app.
+                </p>
+                <Button asChild>
+                  <a href={evidenceHref} target="_blank" rel="noreferrer">
+                    Open attachment
+                  </a>
+                </Button>
+              </div>
+            )}
+            {post.imageUrl && !evidenceHref && (
+              <p className="text-sm text-muted-foreground">
+                This evidence is unavailable, expired, or hidden because it does not meet the app&apos;s current privacy rules.
+              </p>
             )}
           </div>
         </DialogContent>

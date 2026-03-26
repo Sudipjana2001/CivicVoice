@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { 
   Inbox, 
   Mail, 
@@ -10,15 +11,12 @@ import {
   Lock,
   AlertTriangle,
   Trash2,
-  Reply,
   LogIn,
   ArrowLeft
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Switch } from '@/components/ui/switch';
-import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { formatDistanceToNow } from 'date-fns';
@@ -26,9 +24,6 @@ import { InboxService } from '@/services/InboxService';
 import type { InboxMessage } from '@/services/InboxService';
 import { useAuth } from '@/hooks/useAuth';
 import { useIsMobile } from '@/hooks/use-mobile';
-import { getAnonymousSession } from '@/lib/anonymity';
-import { Link } from 'react-router-dom';
-
 type SenderType = 'ngo' | 'journalist' | 'moderator';
 
 const inboxService = InboxService.getInstance();
@@ -45,28 +40,30 @@ interface AnonymousInboxProps {
 
 export function AnonymousInbox({ className }: AnonymousInboxProps) {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const isMobile = useIsMobile();
   const [messages, setMessages] = useState<InboxMessage[]>([]);
   const [selectedMessage, setSelectedMessage] = useState<InboxMessage | null>(null);
-  const [replyEnabled, setReplyEnabled] = useState<Record<string, boolean>>({});
   const [loading, setLoading] = useState(true);
-
-  const session = getAnonymousSession();
 
   const fetchMessages = useCallback(async () => {
     setLoading(true);
     try {
-      const data = await inboxService.fetchMessages(session.id);
+      const data = await inboxService.fetchMessages();
       setMessages(data);
     } catch (error) {
       console.error('Error fetching inbox messages:', error);
     }
     setLoading(false);
-  }, [session.id]);
+  }, []);
 
   useEffect(() => {
     if (user) fetchMessages();
-    else setLoading(false);
+    else {
+      setMessages([]);
+      setSelectedMessage(null);
+      setLoading(false);
+    }
   }, [user, fetchMessages]);
 
   const unreadCount = messages.filter(m => !m.read).length;
@@ -80,10 +77,6 @@ export function AnonymousInbox({ className }: AnonymousInboxProps) {
     await inboxService.deleteMessage(messageId);
     setMessages(prev => prev.filter(m => m.id !== messageId));
     if (selectedMessage?.id === messageId) setSelectedMessage(null);
-  };
-
-  const toggleReply = (messageId: string) => {
-    setReplyEnabled(prev => ({ ...prev, [messageId]: !prev[messageId] }));
   };
 
   const handleSelectMessage = (message: InboxMessage) => {
@@ -149,7 +142,12 @@ export function AnonymousInbox({ className }: AnonymousInboxProps) {
           {selectedMessage.relatedPostId && (
             <div className="mt-4 p-3 rounded-lg bg-muted/30 border border-border/50">
               <p className="text-xs text-muted-foreground">Related to incident:</p>
-              <Button variant="link" size="sm" className="h-auto p-0 text-primary">
+              <Button
+                variant="link"
+                size="sm"
+                className="h-auto p-0 text-primary"
+                onClick={() => navigate(`/comments/${selectedMessage.relatedPostId}`)}
+              >
                 View incident #{selectedMessage.relatedPostId.substring(0, 8)}
               </Button>
             </div>
@@ -160,18 +158,10 @@ export function AnonymousInbox({ className }: AnonymousInboxProps) {
           <div className="flex items-start gap-3">
             <AlertTriangle className="h-4 w-4 text-severity-medium flex-shrink-0 mt-0.5" />
             <div className="flex-1">
-              <div className="flex items-center justify-between">
-                <Label htmlFor={`reply-${selectedMessage.id}`} className="text-sm font-medium">Enable replies</Label>
-                <Switch id={`reply-${selectedMessage.id}`} checked={replyEnabled[selectedMessage.id] || false} onCheckedChange={() => toggleReply(selectedMessage.id)} />
-              </div>
+              <p className="text-sm font-medium">Replies unavailable</p>
               <p className="text-xs text-muted-foreground mt-1">
-                {replyEnabled[selectedMessage.id]
-                  ? 'Replies enabled. Your identity remains protected.'
-                  : 'Replies disabled to protect your anonymity.'}
+                Inbox messages are currently one-way. You can review the related incident and keep the message for context, but direct replies are not supported yet.
               </p>
-              {replyEnabled[selectedMessage.id] && (
-                <Button size="sm" className="mt-2 gap-1" variant="outline"><Reply className="h-3 w-3" />Compose Reply</Button>
-              )}
             </div>
           </div>
         </div>
@@ -235,7 +225,7 @@ export function AnonymousInbox({ className }: AnonymousInboxProps) {
           </div>
           <p className="text-xs text-muted-foreground flex items-center gap-1 mt-1">
             <Lock className="h-3 w-3" />
-            One-way secure messaging from verified organizations
+            One-way inbox messages from organizations and moderators
           </p>
         </CardHeader>
         <CardContent className="p-0">
@@ -306,7 +296,7 @@ export function AnonymousInbox({ className }: AnonymousInboxProps) {
           <div className="p-3 border-t border-border/50 bg-muted/10">
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
               <Shield className="h-4 w-4 text-primary flex-shrink-0" />
-              <span>All messages are encrypted. Senders cannot identify you.</span>
+              <span>Messages stay inside CivicVoice, and your contact details are not shown in the inbox UI.</span>
             </div>
           </div>
         </CardContent>

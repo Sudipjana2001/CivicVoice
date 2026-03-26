@@ -56,7 +56,6 @@ export function ReportPostDialog({ postId, triggerClassName, onReported, trigger
     try {
       await reportService.submit({
         postId,
-        reporterUserId: user.id,
         reason,
         details,
       });

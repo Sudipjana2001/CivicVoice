@@ -44,6 +44,12 @@ export class CommentService {
     });
 
     if (error) throw error;
-    return data as CommentRow;
+
+    const row = Array.isArray(data) ? data[0] : data;
+    if (!row) {
+      throw new Error('Comment creation returned no data');
+    }
+
+    return row as CommentRow;
   }
 }

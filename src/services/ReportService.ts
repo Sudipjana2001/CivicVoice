@@ -9,7 +9,6 @@ export type ReportReason =
   | 'other';
 
 export interface PostReportMeta {
-  count: number;
   hasReported: boolean;
 }
 
@@ -25,46 +24,38 @@ export class ReportService {
     return ReportService.instance;
   }
 
-  async getMeta(postId: string, reporterUserId?: string): Promise<PostReportMeta> {
-    const countPromise = supabase
+  async getMeta(postId: string): Promise<PostReportMeta> {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) {
+      return { hasReported: false };
+    }
+
+    const { data, error } = await supabase
       .from('post_reports')
-      .select('*', { count: 'exact', head: true })
-      .eq('post_id', postId);
+      .select('id')
+      .eq('post_id', postId)
+      .eq('reporter_user_id', user.id)
+      .maybeSingle();
 
-    const hasReportedPromise = reporterUserId
-      ? supabase
-          .from('post_reports')
-          .select('id')
-          .eq('post_id', postId)
-          .eq('reporter_user_id', reporterUserId)
-          .maybeSingle()
-      : Promise.resolve({ data: null, error: null });
-
-    const [{ count, error: countError }, { data, error: hasReportedError }] = await Promise.all([
-      countPromise,
-      hasReportedPromise,
-    ]);
-
-    if (countError) throw countError;
-    if (hasReportedError) throw hasReportedError;
+    if (error) throw error;
 
     return {
-      count: typeof count === 'number' ? count : 0,
       hasReported: Boolean(data),
     };
   }
 
   async submit(params: {
     postId: string;
-    reporterUserId: string;
     reason: ReportReason;
     details?: string;
   }): Promise<void> {
-    const { error } = await supabase.from('post_reports').insert({
-      post_id: params.postId,
-      reporter_user_id: params.reporterUserId,
-      reason: params.reason,
-      details: params.details?.trim() || null,
+    const { error } = await supabase.rpc('submit_post_report', {
+      p_post_id: params.postId,
+      p_reason: params.reason,
+      p_details: params.details?.trim() || null,
     });
 
     if (error) throw error;

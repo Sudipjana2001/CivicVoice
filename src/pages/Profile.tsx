@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { Header } from '@/components/Header';
@@ -13,6 +13,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Input } from '@/components/ui/input';
 import { 
   Shield, 
   User, 
@@ -31,6 +32,7 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { EnhancedPostCard } from '@/components/EnhancedPostCard';
 import { Post } from '@/lib/anonymity';
+import { CATEGORIES as CATEGORY_OPTIONS } from '@/lib/anonymity';
 import { PostService } from '@/services/PostService';
 
 interface Profile {
@@ -63,19 +65,16 @@ interface ActivityItem {
   created_at: string;
 }
 
-const CATEGORIES = [
-  'Infrastructure', 'Public Safety', 'Environment', 'Governance', 
-  'Healthcare', 'Education', 'Transportation', 'Utilities'
-];
+type ProfileTab = 'posts' | 'settings' | 'topics' | 'alerts' | 'activity';
 
-const LOCATIONS = [
-  'Downtown', 'North District', 'South District', 'East Side', 
-  'West Side', 'Industrial Zone', 'Residential Area'
-];
+function isProfileTab(value: string | null): value is ProfileTab {
+  return value === 'posts' || value === 'settings' || value === 'topics' || value === 'alerts' || value === 'activity';
+}
 
 export default function Profile() {
   const { user, loading: authLoading, signOut } = useAuth();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { toast } = useToast();
   
   const [profile, setProfile] = useState<Profile | null>(null);
@@ -89,6 +88,10 @@ export default function Profile() {
   const [userPosts, setUserPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [locationInput, setLocationInput] = useState('');
+
+  const tabParam = searchParams.get('tab');
+  const activeTab: ProfileTab = isProfileTab(tabParam) ? tabParam : 'settings';
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -101,13 +104,29 @@ export default function Profile() {
     
     try {
       // Fetch profile
-      const { data: profileData, error: profileError } = await supabase
+      const { data: initialProfileData, error: profileError } = await supabase
         .from('profiles')
         .select('*')
         .eq('user_id', user.id)
-        .single();
+        .maybeSingle();
+
+      let profileData = initialProfileData;
 
       if (profileError) throw profileError;
+      if (!profileData) {
+        const { data: ensuredProfile, error: ensureError } = await supabase.rpc('update_profile_preferences', {
+          p_inbox_enabled: false,
+          p_self_destruct_days: null,
+        });
+
+        if (ensureError) throw ensureError;
+        profileData = (Array.isArray(ensuredProfile) ? ensuredProfile[0] : ensuredProfile) as Profile | null;
+      }
+
+      if (!profileData) {
+        throw new Error('Profile could not be created');
+      }
+
       setProfile(profileData);
 
       // Fetch followed topics
@@ -161,15 +180,21 @@ export default function Profile() {
     if (!profile) return;
     
     setSaving(true);
-    const { error } = await supabase
-      .from('profiles')
-      .update(updates)
-      .eq('id', profile.id);
+    const nextProfile = {
+      ...profile,
+      ...updates,
+    };
+
+    const { data, error } = await supabase.rpc('update_profile_preferences', {
+      p_inbox_enabled: nextProfile.inbox_enabled,
+      p_self_destruct_days: nextProfile.self_destruct_days,
+    });
+    const savedProfile = Array.isArray(data) ? data[0] : data;
 
     if (error) {
       toast({ title: 'Error', description: 'Failed to update profile', variant: 'destructive' });
     } else {
-      setProfile({ ...profile, ...updates });
+      setProfile((savedProfile as Profile) || nextProfile);
       toast({ title: 'Saved', description: 'Profile updated successfully' });
     }
     setSaving(false);
@@ -195,13 +220,15 @@ export default function Profile() {
 
   const addFollowedTopic = async (type: 'location' | 'category', value: string, label: string) => {
     if (!profile) return;
-    
+
+    const normalizedValue = type === 'location' ? value.trim().toLowerCase() : value.trim();
+
     const { data, error } = await supabase
       .from('followed_topics')
       .insert({
         profile_id: profile.id,
         topic_type: type,
-        topic_value: value,
+        topic_value: normalizedValue,
         topic_label: label
       })
       .select()
@@ -317,7 +344,16 @@ export default function Profile() {
         </Card>
 
         {/* Profile Tabs */}
-        <Tabs defaultValue="settings" className="space-y-6">
+        <Tabs
+          value={activeTab}
+          onValueChange={(value) => {
+            const next = new URLSearchParams(searchParams);
+            if (value === 'settings') next.delete('tab');
+            else next.set('tab', value);
+            setSearchParams(next, { replace: true });
+          }}
+          className="space-y-6"
+        >
           <TabsList className="grid w-full grid-cols-5">
             <TabsTrigger value="posts" className="text-xs sm:text-sm px-1 sm:px-3">My Reports</TabsTrigger>
             <TabsTrigger value="settings" className="text-xs sm:text-sm px-1 sm:px-3">Settings</TabsTrigger>
@@ -393,7 +429,7 @@ export default function Profile() {
                     Auto-Delete Posts
                   </Label>
                   <p className="text-xs sm:text-sm text-muted-foreground">
-                    Automatically delete your posts after a set period
+                    Queue your future reports for scheduled deletion after a set period. This is not immediate erasure and depends on cleanup jobs running.
                   </p>
                   <Select
                     value={profile.self_destruct_days?.toString() || 'never'}
@@ -417,49 +453,44 @@ export default function Profile() {
 
                 <Separator />
 
-                {/* Emergency Wipe */}
+                {/* Best-effort wipe */}
                 <div className="space-y-2">
                   <Label className="flex items-center gap-2 text-sm text-destructive">
                     <AlertTriangle className="h-4 w-4" />
-                    Emergency Wipe
+                    Best-Effort Wipe
                   </Label>
                   <p className="text-xs sm:text-sm text-muted-foreground">
-                    Deletes all your data older than 6 months from the database, then erases 
-                    all local traces (cookies, storage, cache) from this device. 
-                    Your last 6 months of activity are preserved.
+                    Runs a best-effort cleanup of server records older than 6 months that belong to your account, then clears local traces from this device. Storage files or already shared copies may still need separate cleanup.
                   </p>
                   <Button 
                     variant="destructive" 
                     size="sm"
                     onClick={async () => {
                       if (!window.confirm(
-                        'This will:\n• Delete all your DB data older than 6 months\n• Erase ALL local data from this device\n• Redirect to a blank page\n\nYour last 6 months of posts, votes, and comments will be kept.\n\nContinue?'
+                        'This will:\n• Run a best-effort cleanup of older server records tied to your account\n• Erase local storage, cookies, and cache from this device\n• Redirect to a blank page\n\nThis is not a guarantee that every copy is erased.\n\nContinue?'
                       )) return;
 
                       try {
-                        // Step 1: Delete old data from database
                         const { DataWipeService } = await import('@/services/DataWipeService');
                         const wipeService = DataWipeService.getInstance();
-                        const result = await wipeService.emergencyWipe(user!.id);
+                        const result = await wipeService.emergencyWipe();
                         
                         if (result.success) {
                           const total = Object.values(result.deletedCounts).reduce((a, b) => a + b, 0);
-                          alert(`Wiped ${total} records older than 6 months.\nNow clearing local data...`);
+                          alert(`Cleaned up ${total} older records that the server could remove.\nNow clearing local data...`);
                         }
 
-                        // Step 2: Wipe all local traces
                         const { panicWipe } = await import('@/lib/privacyShield');
                         panicWipe();
                       } catch (err) {
                         console.error('Wipe failed:', err);
-                        // Still wipe local data even if DB wipe fails
                         const { panicWipe } = await import('@/lib/privacyShield');
                         panicWipe();
                       }
                     }}
                   >
                     <AlertTriangle className="h-3 w-3 mr-1" />
-                    Emergency Wipe
+                    Best-Effort Wipe
                   </Button>
                 </div>
               </CardContent>
@@ -516,20 +547,34 @@ export default function Profile() {
                     <MapPin className="h-4 w-4" />
                     Follow Location
                   </Label>
-                  <div className="flex gap-2 flex-wrap">
-                    {LOCATIONS.filter(loc => 
-                      !followedTopics.some(t => t.topic_type === 'location' && t.topic_value === loc)
-                    ).map((location) => (
-                      <Button
-                        key={location}
-                        variant="outline"
-                        size="sm"
-                        onClick={() => addFollowedTopic('location', location, location)}
-                      >
-                        <Plus className="h-3 w-3 mr-1" />
-                        {location}
-                      </Button>
-                    ))}
+                  <div className="flex gap-2">
+                    <Input
+                      value={locationInput}
+                      onChange={(e) => setLocationInput(e.target.value)}
+                      placeholder="Enter a town, village, street, or lane"
+                      className="flex-1"
+                    />
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={
+                        !locationInput.trim() ||
+                        followedTopics.some(
+                          (topic) =>
+                            topic.topic_type === 'location' &&
+                            topic.topic_value === locationInput.trim().toLowerCase()
+                        )
+                      }
+                      onClick={() => {
+                        const trimmedLocation = locationInput.trim();
+                        if (!trimmedLocation) return;
+                        addFollowedTopic('location', trimmedLocation, trimmedLocation);
+                        setLocationInput('');
+                      }}
+                    >
+                      <Plus className="h-3 w-3 mr-1" />
+                      Add
+                    </Button>
                   </div>
                 </div>
 
@@ -540,17 +585,21 @@ export default function Profile() {
                     Follow Category
                   </Label>
                   <div className="flex gap-2 flex-wrap">
-                    {CATEGORIES.filter(cat => 
-                      !followedTopics.some(t => t.topic_type === 'category' && t.topic_value === cat)
+                    {CATEGORY_OPTIONS.filter((category) => 
+                      !followedTopics.some(
+                        (topic) =>
+                          topic.topic_type === 'category' &&
+                          (topic.topic_value === category.id || topic.topic_label === category.label)
+                      )
                     ).map((category) => (
                       <Button
-                        key={category}
+                        key={category.id}
                         variant="outline"
                         size="sm"
-                        onClick={() => addFollowedTopic('category', category, category)}
+                        onClick={() => addFollowedTopic('category', category.id, category.label)}
                       >
                         <Plus className="h-3 w-3 mr-1" />
-                        {category}
+                        {category.label}
                       </Button>
                     ))}
                   </div>

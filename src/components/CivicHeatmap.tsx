@@ -23,7 +23,7 @@ interface HeatmapData {
   severity: 'low' | 'medium' | 'high';
 }
 
-// Static geocoding lookup for common locations (fallback for quick resolution)
+// Static geocoding lookup for common locations.
 const LOCATION_COORDS: Record<string, { lat: number; lng: number }> = {
   'mumbai': { lat: 19.076, lng: 72.8777 },
   'delhi': { lat: 28.6139, lng: 77.209 },
@@ -103,6 +103,10 @@ const LOCATION_COORDS: Record<string, { lat: number; lng: number }> = {
   'industrial zone': { lat: 19.033, lng: 73.0297 },
 };
 
+function normalizeLocationKey(location: string): string {
+  return location.toLowerCase().trim().replace(/,?\s*india\s*$/i, '').trim();
+}
+
 // Geocode using OpenStreetMap Nominatim API (free, no API key needed)
 async function geocodeLocation(location: string): Promise<{ lat: number; lng: number } | null> {
   try {
@@ -121,16 +125,23 @@ async function geocodeLocation(location: string): Promise<{ lat: number; lng: nu
 
 function getCoordinatesForLocation(location: string): { lat: number; lng: number } | null {
   const lower = location.toLowerCase().trim();
-  // Remove ", india" suffix for matching
-  const cleaned = lower.replace(/,?\s*india\s*$/i, '').trim();
+  const cleaned = normalizeLocationKey(location);
 
   // Direct match
   if (LOCATION_COORDS[cleaned]) return LOCATION_COORDS[cleaned];
   if (LOCATION_COORDS[lower]) return LOCATION_COORDS[lower];
 
-  // Partial match
-  for (const [key, coords] of Object.entries(LOCATION_COORDS)) {
-    if (cleaned.includes(key) || key.includes(cleaned)) return coords;
+  return null;
+}
+
+function getFallbackCoordinatesForLocation(location: string): { lat: number; lng: number } | null {
+  const segments = normalizeLocationKey(location)
+    .split(',')
+    .map((segment) => segment.trim())
+    .filter(Boolean);
+
+  for (const segment of segments) {
+    if (LOCATION_COORDS[segment]) return LOCATION_COORDS[segment];
   }
 
   return null;
@@ -192,9 +203,13 @@ export function CivicHeatmap({ className }: CivicHeatmapProps) {
     for (const [location, locData] of Object.entries(locationMap)) {
       let coords = getCoordinatesForLocation(location);
 
-      // If not found in static lookup, try geocoding API
+      // Try the exact location text before falling back to broader known segments.
       if (!coords) {
         coords = await geocodeLocation(location);
+      }
+
+      if (!coords) {
+        coords = getFallbackCoordinatesForLocation(location);
       }
 
       if (!coords) continue;
@@ -325,7 +340,7 @@ export function CivicHeatmap({ className }: CivicHeatmapProps) {
             {/* Privacy notice */}
             <div className="absolute bottom-3 left-3 z-[1000] flex items-center gap-2 px-3 py-2 bg-card/90 backdrop-blur-sm rounded-lg shadow-md border border-border/50">
               <Layers className="h-3 w-3 text-muted-foreground" />
-              <span className="text-xs text-muted-foreground">Approximate locations only</span>
+              <span className="text-xs text-muted-foreground">Markers use the most specific location we can resolve</span>
             </div>
           </div>
 

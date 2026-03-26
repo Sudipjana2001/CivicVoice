@@ -2,6 +2,7 @@ import { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { 
+  Calendar,
   Clock, 
   MapPin, 
   ThumbsUp, 
@@ -16,7 +17,6 @@ import {
   ExternalLink,
   ChevronDown,
   ChevronUp,
-  LogIn,
   MoreVertical,
   Edit2,
   Trash2,
@@ -35,9 +35,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { CategoryBadge } from './CategoryBadge';
 import { SeverityBadge } from './SeverityBadge';
-import { EvidenceConfidenceScore } from './EvidenceConfidenceScore';
 import { IncidentStatusBadge } from './IncidentStatusBadge';
-import { VisibilityTags } from './VisibilityTags';
 import { CredibilityBadge } from './CredibilityBadge';
 import { LegalDisclaimer } from './LegalDisclaimer';
 import { RelatedIncidents } from './RelatedIncidents';
@@ -46,13 +44,15 @@ import { ReportPostButton } from './ReportPostButton';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useAuth } from '@/hooks/useAuth';
 import { VoteService } from '@/services/VoteService';
-import { getAnonymousSession } from '@/lib/anonymity';
+import { EvidenceService } from '@/services/EvidenceService';
 import type { Post, EvidenceType } from '@/lib/anonymity';
 import type { IncidentStatus, ConfidenceLevel, VisibilityTag, CredibilityBadgeInfo, RelatedIncident } from '@/lib/types';
+import { formatIncidentTiming } from '@/lib/postTiming';
 import { formatDistanceToNow } from 'date-fns';
 import { toast } from 'sonner';
 
 const voteService = VoteService.getInstance();
+const evidenceService = EvidenceService.getInstance();
 
 const evidenceIconMap: Record<EvidenceType, React.ElementType> = {
   photo: Camera,
@@ -95,18 +95,51 @@ export function EnhancedPostCard({ post, onCommentsClick, isCommentsOpen, onPost
   const [isSubmittingEdit, setIsSubmittingEdit] = useState(false);
   const [isEvidenceViewerOpen, setIsEvidenceViewerOpen] = useState(false);
   const [votePulse, setVotePulse] = useState<'credible' | 'suspicious' | null>(null);
+  const [evidenceHref, setEvidenceHref] = useState<string | null>(null);
 
-  const session = getAnonymousSession();
   // Ownership is server-backed through posts.user_id
   const isOwner = Boolean(user?.id && post.userId && user.id === post.userId);
 
   // Fetch existing vote on mount
   useEffect(() => {
     if (!user) return; // Only check votes for logged-in users
-    voteService.getUserVote(post.id, session.token).then(vote => {
-      if (vote) setUserVote(vote);
-    });
-  }, [post.id, session.token, user]);
+    voteService.getUserVote(post.id)
+      .then(vote => {
+        if (vote) setUserVote(vote);
+      })
+      .catch((error) => {
+        console.error('Error loading vote state:', error);
+      });
+  }, [post.id, user]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadEvidenceUrl = async () => {
+      if (!post.imageUrl) {
+        setEvidenceHref(null);
+        return;
+      }
+
+      try {
+        const url = await evidenceService.resolveEvidenceUrl(post.imageUrl);
+        if (!cancelled) {
+          setEvidenceHref(url);
+        }
+      } catch (error) {
+        console.error('Error resolving evidence:', error);
+        if (!cancelled) {
+          setEvidenceHref(null);
+        }
+      }
+    };
+
+    loadEvidenceUrl();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [post.imageUrl]);
 
   const handleCommentsClick = () => {
     if (isMobile) {
@@ -145,7 +178,6 @@ export function EnhancedPostCard({ post, onCommentsClick, isCommentsOpen, onPost
     try {
       const result = await voteService.toggleVote(
         post.id,
-        session.token,
         type,
       );
       setUserVote(result.newVote);
@@ -201,15 +233,13 @@ export function EnhancedPostCard({ post, onCommentsClick, isCommentsOpen, onPost
   };
 
   const EvidenceIcon = post.evidenceType ? evidenceIconMap[post.evidenceType] : null;
-  const status = post.status || 'submitted';
-  const confidenceScore = post.confidenceScore || 'medium';
-  const visibilityTags = post.visibilityTags || [];
-  const credibilityBadge = post.credibilityBadge || { level: 'new', reportsCount: 1, credibilityScore: 75 };
+  const status = (post.status || 'submitted') as IncidentStatus;
+  const credibilityBadge = post.credibilityBadge;
   const isLongContent = post.content.length > CONTENT_PREVIEW_LIMIT;
   const displayContent = isContentExpanded || !isLongContent
     ? post.content
     : `${post.content.slice(0, CONTENT_PREVIEW_LIMIT).trimEnd()}...`;
-  const evidenceHref = post.imageUrl ?? null;
+  const incidentTiming = formatIncidentTiming(post);
 
   return (
     <>
@@ -239,7 +269,7 @@ export function EnhancedPostCard({ post, onCommentsClick, isCommentsOpen, onPost
             )}
             <div className="absolute inset-0 bg-gradient-to-t from-card to-transparent pointer-events-none" />
             <div className="absolute top-2 right-2 bg-card/80 backdrop-blur-sm px-2 py-1 rounded text-xs text-muted-foreground">
-              Faces auto-blurred
+              Private evidence
             </div>
             <div className="absolute bottom-2 right-2">
               <Button size="sm" variant="secondary" className="gap-1 h-8 cv-interactive" onClick={() => setIsEvidenceViewerOpen(true)}>
@@ -253,6 +283,7 @@ export function EnhancedPostCard({ post, onCommentsClick, isCommentsOpen, onPost
         <div className="p-4 sm:p-5">
           {/* Header badges */}
           <div className="flex flex-wrap items-center gap-2 mb-3">
+            <IncidentStatusBadge status={status} size="sm" />
             <CategoryBadge category={post.category} size="sm" />
             <SeverityBadge severity={post.severity} size="sm" />
 
@@ -267,11 +298,17 @@ export function EnhancedPostCard({ post, onCommentsClick, isCommentsOpen, onPost
           {/* Anonymous ID, credibility badge, and metadata */}
           <div className="flex items-center flex-wrap gap-3 text-xs text-muted-foreground mb-3">
             <span className="anonymous-id font-medium">{post.anonymousId}</span>
-            <CredibilityBadge badge={credibilityBadge} />
+            {credibilityBadge && <CredibilityBadge badge={credibilityBadge} />}
             <span className="flex items-center gap-1">
               <Clock className="h-3 w-3" />
               {formatDistanceToNow(post.createdAt, { addSuffix: true })}
             </span>
+            {incidentTiming && (
+              <span className="flex items-center gap-1">
+                <Calendar className="h-3 w-3" />
+                {incidentTiming}
+              </span>
+            )}
             {post.location && (
               <span className="flex items-center gap-1">
                 <MapPin className="h-3 w-3" />
@@ -279,6 +316,14 @@ export function EnhancedPostCard({ post, onCommentsClick, isCommentsOpen, onPost
               </span>
             )}
           </div>
+
+          {post.imageUrl && !evidenceHref && (
+            <div className="mb-3 rounded-lg border border-border/50 bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
+              {user
+                ? 'Private evidence is attached, but the temporary access link is unavailable right now.'
+                : 'Private evidence is attached to this report. Sign in to open it with a temporary access link.'}
+            </div>
+          )}
 
           {/* Content */}
           {isEditing ? (
@@ -459,10 +504,33 @@ export function EnhancedPostCard({ post, onCommentsClick, isCommentsOpen, onPost
             </video>
           )}
           {post.evidenceType === 'document' && evidenceHref && (
-            <iframe title="Evidence document" src={evidenceHref} className="w-full h-[70vh] rounded-md border cv-media-enter" />
+            <div className="space-y-3 cv-media-enter">
+              <p className="text-sm text-muted-foreground">
+                Documents open in a separate tab so CivicVoice does not embed third-party viewers directly.
+              </p>
+              <Button asChild>
+                <a href={evidenceHref} target="_blank" rel="noreferrer">
+                  Open document
+                </a>
+              </Button>
+            </div>
           )}
           {post.evidenceType && post.evidenceType !== 'photo' && post.evidenceType !== 'video' && post.evidenceType !== 'document' && evidenceHref && (
-            <iframe title="Evidence content" src={evidenceHref} className="w-full h-[70vh] rounded-md border cv-media-enter" />
+            <div className="space-y-3 cv-media-enter">
+              <p className="text-sm text-muted-foreground">
+                This attachment opens in a separate tab to avoid embedding unknown content inside the app.
+              </p>
+              <Button asChild>
+                <a href={evidenceHref} target="_blank" rel="noreferrer">
+                  Open attachment
+                </a>
+              </Button>
+            </div>
+          )}
+          {post.imageUrl && !evidenceHref && (
+            <p className="text-sm text-muted-foreground">
+              This evidence is unavailable, expired, or hidden because it does not meet the app&apos;s current privacy rules.
+            </p>
           )}
         </div>
       </DialogContent>

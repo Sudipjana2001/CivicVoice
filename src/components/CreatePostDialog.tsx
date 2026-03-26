@@ -27,7 +27,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { CATEGORIES, SEVERITY_LEVELS, EVIDENCE_TYPES, getAnonymousSession } from '@/lib/anonymity';
+import { CATEGORIES, SEVERITY_LEVELS, EVIDENCE_TYPES } from '@/lib/anonymity';
 import type { Category, Severity, EvidenceType, Post } from '@/lib/anonymity';
 import { toast } from 'sonner';
 
@@ -44,8 +44,6 @@ export function CreatePostDialog({ onPostCreated }: CreatePostDialogProps) {
   const [location, setLocation] = useState('');
   const [imageUrl, setImageUrl] = useState('');
 
-  const session = getAnonymousSession();
-
   const handleSubmit = () => {
     if (!content.trim()) {
       toast.error('Please provide a description of the incident');
@@ -54,7 +52,7 @@ export function CreatePostDialog({ onPostCreated }: CreatePostDialogProps) {
 
     const newPost: Post = {
       id: crypto.randomUUID(),
-      anonymousId: session.id,
+      anonymousId: 'Protected profile',
       content: content.trim(),
       category,
       severity,
@@ -78,8 +76,8 @@ export function CreatePostDialog({ onPostCreated }: CreatePostDialogProps) {
     setImageUrl('');
     setOpen(false);
 
-    toast.success('Report submitted anonymously', {
-      description: 'Your identity remains protected.',
+    toast.success('Draft report submitted', {
+      description: 'Public identity should be generated from your signed-in profile in the guided flow.',
     });
   };
 
@@ -98,8 +96,7 @@ export function CreatePostDialog({ onPostCreated }: CreatePostDialogProps) {
             Submit Anonymous Report
           </DialogTitle>
           <DialogDescription className="text-muted-foreground">
-            Your identity will remain protected. Reporting as{' '}
-            <span className="anonymous-id">{session.id}</span>
+            Public reports should use the pseudonymous ID attached to your signed-in profile.
           </DialogDescription>
         </DialogHeader>
 
@@ -181,15 +178,18 @@ export function CreatePostDialog({ onPostCreated }: CreatePostDialogProps) {
           <div className="space-y-2">
             <Label htmlFor="location" className="flex items-center gap-2">
               <MapPin className="h-3.5 w-3.5" />
-              Location (Optional - City/District level only)
+              Location (Optional)
             </Label>
             <Input
               id="location"
-              placeholder="e.g., Downtown District, Metro Area"
+              placeholder="e.g., Town name, village, street, lane, or landmark"
               value={location}
               onChange={(e) => setLocation(e.target.value)}
               className="bg-muted/50 border-border"
             />
+            <p className="text-xs text-muted-foreground">
+              Enter the exact public place if you know it, such as a town, village, ward, lane, or landmark.
+            </p>
           </div>
 
           {/* Image URL */}
@@ -206,7 +206,7 @@ export function CreatePostDialog({ onPostCreated }: CreatePostDialogProps) {
               className="bg-muted/50 border-border"
             />
             <p className="text-xs text-muted-foreground">
-              Full file upload requires backend setup. For now, use an image URL.
+              This legacy dialog is best for text-only drafts. Use the guided report flow for private evidence uploads.
             </p>
           </div>
         </div>

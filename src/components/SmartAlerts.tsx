@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { 
   Bell, 
   BellRing, 
@@ -22,7 +23,6 @@ import { formatDistanceToNow } from 'date-fns';
 import { InboxService } from '@/services/InboxService';
 import type { Alert } from '@/services/InboxService';
 import { useAuth } from '@/hooks/useAuth';
-import { getAnonymousSession } from '@/lib/anonymity';
 
 const inboxService = InboxService.getInstance();
 
@@ -34,25 +34,25 @@ const alertTypeConfig = {
 
 export function SmartAlerts() {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  const session = getAnonymousSession();
-
   const fetchAlerts = useCallback(async () => {
     setLoading(true);
     try {
-      const data = await inboxService.fetchAlerts(session.id);
+      const data = await inboxService.fetchAlerts();
       setAlerts(data);
     } catch (error) {
       console.error('Error fetching alerts:', error);
     }
     setLoading(false);
-  }, [session.id]);
+  }, []);
 
   useEffect(() => {
     if (open && user) fetchAlerts();
+    if (!user) setAlerts([]);
   }, [open, user, fetchAlerts]);
 
   const unreadCount = alerts.filter(a => !a.read).length;
@@ -147,7 +147,17 @@ export function SmartAlerts() {
         </ScrollArea>
 
         <div className="p-2 border-t border-border/50">
-          <Button variant="ghost" size="sm" className="w-full text-xs text-muted-foreground">Manage alert preferences</Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="w-full text-xs text-muted-foreground"
+            onClick={() => {
+              setOpen(false);
+              navigate('/profile?tab=alerts');
+            }}
+          >
+            Manage alert preferences
+          </Button>
         </div>
       </PopoverContent>
     </Popover>

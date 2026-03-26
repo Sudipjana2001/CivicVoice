@@ -17,10 +17,9 @@ export class VoteService {
   }
 
   /** Get the current user's vote on a post. */
-  async getUserVote(postId: string, voterId: string): Promise<'credible' | 'suspicious' | null> {
+  async getUserVote(postId: string): Promise<'credible' | 'suspicious' | null> {
     const { data, error } = await supabase.rpc('get_user_vote', {
       p_post_id: postId,
-      p_voter_id: voterId,
     });
     if (error) throw error;
 
@@ -30,7 +29,6 @@ export class VoteService {
   /** Cast or toggle a vote. Returns the new vote state and updated counts. */
   async toggleVote(
     postId: string,
-    voterId: string,
     voteType: 'credible' | 'suspicious',
   ): Promise<{
     newVote: 'credible' | 'suspicious' | null;
@@ -39,7 +37,6 @@ export class VoteService {
   }> {
     const { data, error } = await supabase.rpc('toggle_vote_and_update_counts', {
       p_post_id: postId,
-      p_voter_id: voterId,
       p_vote_type: voteType,
     });
     if (error) throw error;

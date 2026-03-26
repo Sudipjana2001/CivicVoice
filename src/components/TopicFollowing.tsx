@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Bell, BellOff, MapPin, Tag, Plus, X } from 'lucide-react';
+import { Bell, MapPin, Tag, Plus, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -111,7 +111,7 @@ export function TopicFollowing({ followedTopics, onFollow, onUnfollow }: TopicFo
 
               {topicType === 'location' ? (
                 <Input
-                  placeholder="Enter city or district..."
+                  placeholder="Enter a town, village, street, or lane..."
                   value={locationInput}
                   onChange={(e) => setLocationInput(e.target.value)}
                   className="flex-1 bg-muted/50"

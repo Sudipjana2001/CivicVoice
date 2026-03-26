@@ -41,12 +41,18 @@ export class InboxService {
 
   // ── Inbox Messages ──────────────────────────────────────
 
-  /** Fetch inbox messages for a given anonymous ID. */
-  async fetchMessages(anonymousId: string): Promise<InboxMessage[]> {
+  /** Fetch inbox messages for the current authenticated user. */
+  async fetchMessages(): Promise<InboxMessage[]> {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) return [];
+
     const { data, error } = await supabase
       .from('inbox_messages')
       .select('*')
-      .eq('recipient_anonymous_id', anonymousId)
+      .eq('recipient_user_id', user.id)
       .order('created_at', { ascending: false });
 
     if (error) throw error;
@@ -66,28 +72,38 @@ export class InboxService {
 
   /** Mark a message as read. */
   async markMessageRead(messageId: string): Promise<void> {
-    await supabase
+    const { error } = await supabase
       .from('inbox_messages')
       .update({ read: true })
       .eq('id', messageId);
+
+    if (error) throw error;
   }
 
   /** Delete a message. */
   async deleteMessage(messageId: string): Promise<void> {
-    await supabase
+    const { error } = await supabase
       .from('inbox_messages')
       .delete()
       .eq('id', messageId);
+
+    if (error) throw error;
   }
 
   // ── Alerts ──────────────────────────────────────────────
 
-  /** Fetch alerts for a given anonymous ID. */
-  async fetchAlerts(anonymousId: string): Promise<Alert[]> {
+  /** Fetch alerts for the current authenticated user. */
+  async fetchAlerts(): Promise<Alert[]> {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) return [];
+
     const { data, error } = await supabase
       .from('alerts')
       .select('*')
-      .eq('recipient_anonymous_id', anonymousId)
+      .eq('recipient_user_id', user.id)
       .order('created_at', { ascending: false });
 
     if (error) throw error;
@@ -110,27 +126,33 @@ export class InboxService {
 
   /** Mark an alert as read. */
   async markAlertRead(alertId: string): Promise<void> {
-    await supabase
+    const { error } = await supabase
       .from('alerts')
       .update({ read: true })
       .eq('id', alertId);
+
+    if (error) throw error;
   }
 
   /** Mark multiple alerts as read. */
   async markAlertsRead(alertIds: string[]): Promise<void> {
     if (alertIds.length === 0) return;
-    await supabase
+    const { error } = await supabase
       .from('alerts')
       .update({ read: true })
       .in('id', alertIds);
+
+    if (error) throw error;
   }
 
   /** Delete an alert. */
   async deleteAlert(alertId: string): Promise<void> {
-    await supabase
+    const { error } = await supabase
       .from('alerts')
       .delete()
       .eq('id', alertId);
+
+    if (error) throw error;
   }
 }
 

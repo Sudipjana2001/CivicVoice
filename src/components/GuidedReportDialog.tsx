@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { 
   Shield, 
   AlertTriangle,
@@ -26,15 +26,17 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Progress } from '@/components/ui/progress';
-import { CATEGORIES, SEVERITY_LEVELS, EVIDENCE_TYPES, getAnonymousSession } from '@/lib/anonymity';
+import { CATEGORIES, SEVERITY_LEVELS, EVIDENCE_TYPES } from '@/lib/anonymity';
 import type { Category, Severity, EvidenceType } from '@/lib/anonymity';
 import type { SelfDestructOption } from '@/lib/types';
+import { formatIncidentTiming } from '@/lib/postTiming';
 import { AnonymityHealthIndicator } from './AnonymityHealthIndicator';
 import { SelfDestructOptions } from './SelfDestructOptions';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useAuth } from '@/hooks/useAuth';
 import { EvidenceService } from '@/services/EvidenceService';
+import { PostService } from '@/services/PostService';
 
 interface GuidedReportDialogProps {
   onPostCreated: () => void;
@@ -51,6 +53,7 @@ const STEPS: { id: Step; label: string; icon: React.ElementType }[] = [
 ];
 
 const evidenceService = EvidenceService.getInstance();
+const postService = PostService.getInstance();
 
 export function GuidedReportDialog({ onPostCreated }: GuidedReportDialogProps) {
   const [open, setOpen] = useState(false);
@@ -64,12 +67,46 @@ export function GuidedReportDialog({ onPostCreated }: GuidedReportDialogProps) {
   const [incidentTime, setIncidentTime] = useState('');
   const [location, setLocation] = useState('');
   const [evidenceType, setEvidenceType] = useState<EvidenceType | ''>('');
-  const [imageUrl, setImageUrl] = useState('');
+  const [evidencePath, setEvidencePath] = useState('');
+  const [evidencePreviewUrl, setEvidencePreviewUrl] = useState('');
   const [selfDestruct, setSelfDestruct] = useState<SelfDestructOption>(null);
-  const [deleteMediaOnly, setDeleteMediaOnly] = useState(false);
+  const [profileAnonymousId, setProfileAnonymousId] = useState<string | null>(null);
 
-  const session = getAnonymousSession();
   const { user } = useAuth();
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadAnonymousId = async () => {
+      if (!user) {
+        if (!cancelled) {
+          setProfileAnonymousId(null);
+        }
+        return;
+      }
+
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('anonymous_id')
+        .eq('user_id', user.id)
+        .maybeSingle();
+
+      if (cancelled) return;
+
+      if (error || !data) {
+        setProfileAnonymousId(null);
+        return;
+      }
+
+      setProfileAnonymousId(data.anonymous_id);
+    };
+
+    loadAnonymousId();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [user]);
 
   const stepIndex = STEPS.findIndex(s => s.id === currentStep);
   const progress = ((stepIndex + 1) / STEPS.length) * 100;
@@ -113,44 +150,40 @@ export function GuidedReportDialog({ onPostCreated }: GuidedReportDialogProps) {
       return;
     }
 
-    setIsSubmitting(true);
-
-    // Calculate self_destruct_at if set
-    let selfDestructAt: string | null = null;
-    if (selfDestruct) {
-      const date = new Date();
-      date.setDate(date.getDate() + selfDestruct);
-      selfDestructAt = date.toISOString();
+    if (!user) {
+      toast.error('Please sign in before submitting a report');
+      return;
     }
 
-    const { error } = await supabase
-      .from('posts')
-      .insert({
-        anonymous_id: session.id,
-        user_id: user?.id || null,
-        content: content.trim(),
+    setIsSubmitting(true);
+
+    try {
+      await postService.create({
+        content,
         category,
         severity,
-        evidence_type: evidenceType || null,
-        location: location.trim() || null,
-        image_url: imageUrl.trim() || null,
-        self_destruct_at: selfDestructAt,
+        evidenceType: evidenceType || undefined,
+        location,
+        incidentDate: incidentDate || undefined,
+        incidentTime: incidentTime || undefined,
+        imageUrl: evidencePath || undefined,
+        selfDestructDays: selfDestruct,
       });
-
-    setIsSubmitting(false);
-
-    if (error) {
+    } catch (error) {
       console.error('Error creating post:', error);
+      setIsSubmitting(false);
       toast.error('Failed to submit report. Please try again.');
       return;
     }
+
+    setIsSubmitting(false);
 
     onPostCreated();
     resetForm();
     setOpen(false);
 
-    toast.success('Report submitted anonymously', {
-      description: 'Your identity remains protected.',
+    toast.success('Report submitted', {
+      description: 'Your public identity stays pseudonymous.',
     });
   };
 
@@ -162,13 +195,15 @@ export function GuidedReportDialog({ onPostCreated }: GuidedReportDialogProps) {
     setIncidentTime('');
     setLocation('');
     setEvidenceType('');
-    setImageUrl('');
+    setEvidencePath('');
+    setEvidencePreviewUrl('');
     setSelfDestruct(null);
-    setDeleteMediaOnly(false);
     setCurrentStep('what');
   };
 
   const renderStep = () => {
+    const incidentTiming = formatIncidentTiming({ incidentDate, incidentTime });
+
     switch (currentStep) {
       case 'what':
         return (
@@ -273,19 +308,19 @@ export function GuidedReportDialog({ onPostCreated }: GuidedReportDialogProps) {
               <MapPin className="h-5 w-5 text-primary flex-shrink-0" />
               <div>
                 <p className="text-sm text-muted-foreground">
-                  Where did this incident occur? Use city or district level only.
+                  Where did this incident occur? Add the most specific public-facing place you know.
                 </p>
                 <p className="text-xs text-muted-foreground mt-1 italic">
-                  ⚠️ Do not provide exact addresses to protect your privacy.
+                  You can include a village, town, neighborhood, street, lane, ward, or landmark. Avoid sharing private contact details.
                 </p>
               </div>
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="location">Location (Optional - City/District level only)</Label>
+              <Label htmlFor="location">Location (Optional)</Label>
               <Input
                 id="location"
-                placeholder="e.g., Downtown District, Metro Area, North Zone"
+                placeholder="e.g., Rampur village, Shivaji Nagar, MG Road Lane 4"
                 value={location}
                 onChange={(e) => setLocation(e.target.value)}
                 className="bg-muted/50 border-border"
@@ -370,8 +405,9 @@ export function GuidedReportDialog({ onPostCreated }: GuidedReportDialogProps) {
                           uploadFile = await stripImageMetadata(file);
                         }
 
-                        const publicUrl = await evidenceService.uploadEvidence(file, uploadFile);
-                        setImageUrl(publicUrl);
+                        const upload = await evidenceService.uploadEvidence(file, uploadFile);
+                        setEvidencePath(upload.path);
+                        setEvidencePreviewUrl(upload.signedUrl);
                         toast.success('File uploaded successfully');
                       } catch (err) {
                         console.error('Upload error:', err);
@@ -391,35 +427,19 @@ export function GuidedReportDialog({ onPostCreated }: GuidedReportDialogProps) {
                     Choose File
                   </Button>
 
-                  {imageUrl && (
+                  {evidencePreviewUrl && (
                     <div className="rounded-lg border border-border/50 p-2 bg-muted/30">
                       {evidenceType === 'photo' ? (
-                        <img src={imageUrl} alt="Uploaded evidence" className="w-full h-32 object-cover rounded" />
+                        <img src={evidencePreviewUrl} alt="Uploaded evidence" className="w-full h-32 object-cover rounded" />
                       ) : (
-                        <p className="text-xs text-muted-foreground truncate">📎 {imageUrl}</p>
+                        <p className="text-xs text-muted-foreground truncate">Attached privately to this report</p>
                       )}
                     </div>
                   )}
-
-                  <div className="relative">
-                    <div className="absolute inset-0 flex items-center">
-                      <span className="w-full border-t border-border/50" />
-                    </div>
-                    <div className="relative flex justify-center text-xs">
-                      <span className="bg-background px-2 text-muted-foreground">or paste URL</span>
-                    </div>
-                  </div>
-
-                  <Input
-                    placeholder="https://..."
-                    value={imageUrl}
-                    onChange={(e) => setImageUrl(e.target.value)}
-                    className="bg-muted/50 border-border"
-                  />
                 </div>
                 
                 <p className="text-xs text-muted-foreground">
-                  ⚠️ Image metadata (EXIF, GPS) is automatically stripped before publishing. Max 10MB.
+                  Files stay private in storage and are shared through signed links. Image metadata is stripped before upload. Max 10MB.
                 </p>
               </div>
             )}
@@ -428,8 +448,6 @@ export function GuidedReportDialog({ onPostCreated }: GuidedReportDialogProps) {
               <SelfDestructOptions
                 value={selfDestruct}
                 onChange={setSelfDestruct}
-                deleteMediaOnly={deleteMediaOnly}
-                onDeleteMediaOnlyChange={setDeleteMediaOnly}
               />
             </div>
           </div>
@@ -461,10 +479,16 @@ export function GuidedReportDialog({ onPostCreated }: GuidedReportDialogProps) {
                   <span className="text-muted-foreground">Severity:</span>
                   <span className="font-medium">{SEVERITY_LEVELS.find(s => s.id === severity)?.label}</span>
                 </div>
+                {incidentTiming && (
+                  <div className="flex justify-between gap-4">
+                    <span className="text-muted-foreground">When:</span>
+                    <span className="font-medium text-right">{incidentTiming}</span>
+                  </div>
+                )}
                 {location && (
-                  <div className="flex justify-between">
+                  <div className="flex justify-between gap-4">
                     <span className="text-muted-foreground">Location:</span>
-                    <span className="font-medium">{location}</span>
+                    <span className="font-medium text-right">{location}</span>
                   </div>
                 )}
                 {evidenceType && (
@@ -475,7 +499,7 @@ export function GuidedReportDialog({ onPostCreated }: GuidedReportDialogProps) {
                 )}
                 {selfDestruct && (
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">Auto-delete:</span>
+                    <span className="text-muted-foreground">Deletion request:</span>
                     <span className="font-medium">{selfDestruct} days</span>
                   </div>
                 )}
@@ -511,7 +535,7 @@ export function GuidedReportDialog({ onPostCreated }: GuidedReportDialogProps) {
             Guided Report Submission
           </DialogTitle>
           <DialogDescription className="text-muted-foreground">
-            Reporting as <span className="anonymous-id">{session.id}</span>
+            Posting under <span className="anonymous-id">{profileAnonymousId ?? 'your protected profile ID'}</span>
           </DialogDescription>
         </DialogHeader>
 

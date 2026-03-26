@@ -93,7 +93,7 @@ export function PostCard({ post }: PostCardProps) {
           </div>
 
           {/* Anonymous ID and metadata */}
-          <div className="flex items-center gap-3 text-xs text-muted-foreground mb-3">
+          <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground mb-3">
             <span className="anonymous-id font-medium">{post.anonymousId}</span>
             <span className="flex items-center gap-1">
               <Clock className="h-3 w-3" />

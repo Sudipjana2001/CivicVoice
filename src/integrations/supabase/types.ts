@@ -89,6 +89,7 @@ export type Database = {
         Row: {
           id: string
           recipient_anonymous_id: string
+          recipient_user_id: string
           type: string
           title: string
           description: string
@@ -102,6 +103,7 @@ export type Database = {
         Insert: {
           id?: string
           recipient_anonymous_id: string
+          recipient_user_id: string
           type: string
           title: string
           description: string
@@ -115,6 +117,7 @@ export type Database = {
         Update: {
           id?: string
           recipient_anonymous_id?: string
+          recipient_user_id?: string
           type?: string
           title?: string
           description?: string
@@ -134,6 +137,7 @@ export type Database = {
           created_at: string
           id: string
           post_id: string
+          user_id: string | null
         }
         Insert: {
           anonymous_id?: string
@@ -141,6 +145,7 @@ export type Database = {
           created_at?: string
           id?: string
           post_id: string
+          user_id?: string | null
         }
         Update: {
           anonymous_id?: string
@@ -148,6 +153,7 @@ export type Database = {
           created_at?: string
           id?: string
           post_id?: string
+          user_id?: string | null
         }
         Relationships: []
       }
@@ -190,6 +196,7 @@ export type Database = {
         Row: {
           id: string
           recipient_anonymous_id: string
+          recipient_user_id: string
           sender_type: string
           sender_label: string
           subject: string
@@ -202,6 +209,7 @@ export type Database = {
         Insert: {
           id?: string
           recipient_anonymous_id: string
+          recipient_user_id: string
           sender_type: string
           sender_label: string
           subject: string
@@ -214,6 +222,7 @@ export type Database = {
         Update: {
           id?: string
           recipient_anonymous_id?: string
+          recipient_user_id?: string
           sender_type?: string
           sender_label?: string
           subject?: string
@@ -234,6 +243,8 @@ export type Database = {
           severity: string
           evidence_type: string | null
           location: string | null
+          incident_date: string | null
+          incident_time: string | null
           image_url: string | null
           credible_votes: number
           suspicious_votes: number
@@ -252,6 +263,8 @@ export type Database = {
           severity: string
           evidence_type?: string | null
           location?: string | null
+          incident_date?: string | null
+          incident_time?: string | null
           image_url?: string | null
           credible_votes?: number
           suspicious_votes?: number
@@ -270,6 +283,8 @@ export type Database = {
           severity?: string
           evidence_type?: string | null
           location?: string | null
+          incident_date?: string | null
+          incident_time?: string | null
           image_url?: string | null
           credible_votes?: number
           suspicious_votes?: number
@@ -363,21 +378,21 @@ export type Database = {
         Row: {
           id: string
           post_id: string
-          voter_id: string
+          voter_user_id: string
           vote_type: string
           created_at: string
         }
         Insert: {
           id?: string
           post_id: string
-          voter_id: string
+          voter_user_id: string
           vote_type: string
           created_at?: string
         }
         Update: {
           id?: string
           post_id?: string
-          voter_id?: string
+          voter_user_id?: string
           vote_type?: string
           created_at?: string
         }

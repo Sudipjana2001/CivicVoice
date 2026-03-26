@@ -1,5 +1,4 @@
 import { supabase } from '@/integrations/supabase/client';
-import type { TablesUpdate } from '@/integrations/supabase/types';
 import type { Post, Category, Severity, EvidenceType } from '@/lib/anonymity';
 
 interface PostRow {
@@ -10,12 +9,16 @@ interface PostRow {
   severity: string;
   evidence_type: string | null;
   location: string | null;
+  incident_date: string | null;
+  incident_time: string | null;
   image_url: string | null;
   created_at: string;
   credible_votes: number;
   suspicious_votes: number;
   comment_count: number;
   report_count: number;
+  status: string;
+  self_destruct_at: string | null;
   user_id: string | null;
 }
 
@@ -45,6 +48,8 @@ export class PostService {
       severity: row.severity as Severity,
       evidenceType: row.evidence_type || undefined,
       location: row.location || undefined,
+      incidentDate: row.incident_date || undefined,
+      incidentTime: row.incident_time || undefined,
       imageUrl: row.image_url || undefined,
       createdAt: new Date(row.created_at),
       credibleVotes: row.credible_votes,
@@ -52,6 +57,8 @@ export class PostService {
       commentCount: row.comment_count,
       reportCount: row.report_count ?? 0,
       userId: row.user_id || undefined,
+      status: row.status,
+      selfDestructAt: row.self_destruct_at ? new Date(row.self_destruct_at) : undefined,
     };
   }
 
@@ -114,53 +121,39 @@ export class PostService {
     severity: Severity;
     evidenceType?: EvidenceType | '';
     location?: string;
+    incidentDate?: string;
+    incidentTime?: string;
     imageUrl?: string;
     selfDestructDays?: number | null;
   }): Promise<Post> {
-    let selfDestructAt: string | null = null;
-    if (params.selfDestructDays) {
-      const date = new Date();
-      date.setDate(date.getDate() + params.selfDestructDays);
-      selfDestructAt = date.toISOString();
-    }
-
     const {
       data: { user },
     } = await supabase.auth.getUser();
 
-    const { data, error } = await supabase
-      .from('posts')
-      .insert({
-        user_id: user?.id || null,
-        content: params.content.trim(),
-        category: params.category,
-        severity: params.severity,
-        evidence_type: params.evidenceType || null,
-        location: params.location?.trim() || null,
-        image_url: params.imageUrl?.trim() || null,
-        self_destruct_at: selfDestructAt,
-      })
-      .select()
-      .single();
+    if (!user) {
+      throw new Error('Authentication required to create a report');
+    }
+
+    const { data, error } = await supabase.rpc('create_post', {
+      p_content: params.content.trim(),
+      p_category: params.category,
+      p_severity: params.severity,
+      p_evidence_type: params.evidenceType || null,
+      p_location: params.location?.trim() || null,
+      p_incident_date: params.incidentDate || null,
+      p_incident_time: params.incidentTime || null,
+      p_image_path: params.imageUrl?.trim() || null,
+      p_self_destruct_days: params.selfDestructDays ?? null,
+    });
 
     if (error) throw error;
-    return this.mapRowToPost(data);
-  }
 
-  /** Update the comment count for a post (increment by 1). */
-  async incrementCommentCount(postId: string): Promise<void> {
-    const { data } = await supabase
-      .from('posts')
-      .select('comment_count')
-      .eq('id', postId)
-      .single();
-
-    if (data) {
-      await supabase
-        .from('posts')
-        .update({ comment_count: data.comment_count + 1 })
-        .eq('id', postId);
+    const row = Array.isArray(data) ? data[0] : data;
+    if (!row) {
+      throw new Error('Post creation returned no data');
     }
+
+    return this.mapRowToPost(row);
   }
 
   /** Update a post's content, category, or severity. Only the owner can update. */
@@ -170,16 +163,13 @@ export class PostService {
     severity?: Severity;
     location?: string;
   }): Promise<void> {
-    const updateData: TablesUpdate<'posts'> = {};
-    if (updates.content !== undefined) updateData.content = updates.content.trim();
-    if (updates.category !== undefined) updateData.category = updates.category;
-    if (updates.severity !== undefined) updateData.severity = updates.severity;
-    if (updates.location !== undefined) updateData.location = updates.location.trim() || null;
-
-    const { error } = await supabase
-      .from('posts')
-      .update(updateData)
-      .eq('id', postId);
+    const { error } = await supabase.rpc('update_own_post', {
+      p_post_id: postId,
+      p_content: updates.content?.trim() || null,
+      p_category: updates.category ?? null,
+      p_severity: updates.severity ?? null,
+      p_location: updates.location !== undefined ? updates.location : null,
+    });
 
     if (error) throw error;
   }

@@ -12,12 +12,14 @@ import { ScrollReveal } from '@/components/ScrollReveal';
 import { PostService } from '@/services/PostService';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
+import { CATEGORIES as CATEGORY_OPTIONS } from '@/lib/anonymity';
 import type { Post, Category, Severity } from '@/lib/anonymity';
 import type { FollowedTopic } from '@/lib/types';
 import { TrendingUp, Clock, LogIn } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useIsMobile } from '@/hooks/use-mobile';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
+import { toast } from 'sonner';
 
 type SortOption = 'recent' | 'trending';
 
@@ -27,6 +29,7 @@ const POSTS_PAGE_SIZE = 10;
 export default function Index() {
   const isMobile = useIsMobile();
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const { user } = useAuth();
 
   const {
@@ -48,6 +51,7 @@ export default function Index() {
   const [selectedSeverity, setSelectedSeverity] = useState<Severity | null>(null);
   const [sortBy, setSortBy] = useState<SortOption>('recent');
   const [followedTopics, setFollowedTopics] = useState<FollowedTopic[]>([]);
+  const [profileId, setProfileId] = useState<string | null>(null);
   const [selectedPostId, setSelectedPostId] = useState<string | null>(null);
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
   const scrollGateRef = useRef(0);
@@ -67,6 +71,95 @@ export default function Index() {
       supabase.removeChannel(channel);
     };
   }, [queryClient]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadFollowedTopics = async () => {
+      if (!user) {
+        if (!cancelled) {
+          setProfileId(null);
+          setFollowedTopics([]);
+        }
+        return;
+      }
+
+      const { data: initialProfile, error: profileError } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('user_id', user.id)
+        .maybeSingle();
+
+      let profile = initialProfile;
+
+      if (profileError) {
+        if (!cancelled) {
+          setProfileId(null);
+          setFollowedTopics([]);
+        }
+        return;
+      }
+
+      if (!profile) {
+        const { data: ensuredProfile, error: ensureError } = await supabase.rpc('update_profile_preferences', {
+          p_inbox_enabled: false,
+          p_self_destruct_days: null,
+        });
+
+        if (ensureError) {
+          if (!cancelled) {
+            setProfileId(null);
+            setFollowedTopics([]);
+          }
+          return;
+        }
+
+        const ensured = Array.isArray(ensuredProfile) ? ensuredProfile[0] : ensuredProfile;
+        profile = ensured ? { id: ensured.id as string } : null;
+      }
+
+      if (!profile) {
+        if (!cancelled) {
+          setProfileId(null);
+          setFollowedTopics([]);
+        }
+        return;
+      }
+
+      const { data: topics, error: topicsError } = await supabase
+        .from('followed_topics')
+        .select('topic_type, topic_value, topic_label')
+        .eq('profile_id', profile.id)
+        .order('created_at', { ascending: true });
+
+      if (cancelled) return;
+
+      if (topicsError) {
+        setProfileId(profile.id);
+        setFollowedTopics([]);
+        return;
+      }
+
+      setProfileId(profile.id);
+      setFollowedTopics((topics || []).map((topic) => ({
+        type: topic.topic_type as FollowedTopic['type'],
+        value:
+          topic.topic_type === 'category'
+            ? CATEGORY_OPTIONS.find(
+                (category) =>
+                  category.id === topic.topic_value || category.label === topic.topic_label
+              )?.id ?? topic.topic_value
+            : topic.topic_value,
+        label: topic.topic_label,
+      })));
+    };
+
+    loadFollowedTopics();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [user]);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -120,12 +213,69 @@ export default function Index() {
     queryClient.invalidateQueries({ queryKey: ['posts'] });
   };
 
-  const handleFollow = (topic: FollowedTopic) => {
-    setFollowedTopics(prev => [...prev, topic]);
+  const handleFollow = async (topic: FollowedTopic) => {
+    if (!user || !profileId) {
+      toast.error('Sign in to follow topics', {
+        action: {
+          label: 'Sign In',
+          onClick: () => navigate('/auth'),
+        },
+      });
+      return;
+    }
+
+    const normalizedValue = topic.type === 'location' ? topic.value.toLowerCase() : topic.value;
+
+    const { data, error } = await supabase
+      .from('followed_topics')
+      .insert({
+        profile_id: profileId,
+        topic_type: topic.type,
+        topic_value: normalizedValue,
+        topic_label: topic.label,
+      })
+      .select('topic_type, topic_value, topic_label')
+      .single();
+
+    if (error) {
+      if (error.code === '23505') {
+        toast.info('You are already following this topic');
+      } else {
+        toast.error('Unable to follow this topic right now');
+      }
+      return;
+    }
+
+    setFollowedTopics((prev) => [
+      ...prev,
+      {
+        type: data.topic_type as FollowedTopic['type'],
+        value: data.topic_value,
+        label: data.topic_label,
+      },
+    ]);
+    toast.success(`Now following ${data.topic_label}`);
   };
 
-  const handleUnfollow = (topic: FollowedTopic) => {
-    setFollowedTopics(prev => prev.filter(t => !(t.type === topic.type && t.value === topic.value)));
+  const handleUnfollow = async (topic: FollowedTopic) => {
+    if (!user || !profileId) {
+      setFollowedTopics((prev) => prev.filter((t) => !(t.type === topic.type && t.value === topic.value)));
+      return;
+    }
+
+    const { error } = await supabase
+      .from('followed_topics')
+      .delete()
+      .eq('profile_id', profileId)
+      .eq('topic_type', topic.type)
+      .eq('topic_value', topic.value);
+
+    if (error) {
+      toast.error('Unable to unfollow this topic right now');
+      return;
+    }
+
+    setFollowedTopics((prev) => prev.filter((t) => !(t.type === topic.type && t.value === topic.value)));
   };
 
   const handleCommentsClick = (post: Post) => {
