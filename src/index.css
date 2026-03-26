@@ -6,6 +6,68 @@
 
 @layer base {
   :root {
+    --background: 210 33% 98%;
+    --foreground: 222 47% 11%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 222 47% 11%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 222 47% 11%;
+
+    --primary: 45 93% 48%;
+    --primary-foreground: 222 47% 10%;
+
+    --secondary: 210 24% 94%;
+    --secondary-foreground: 222 47% 16%;
+
+    --muted: 210 24% 95%;
+    --muted-foreground: 215 16% 40%;
+
+    --accent: 214 32% 91%;
+    --accent-foreground: 222 47% 12%;
+
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 98%;
+
+    --border: 214 24% 86%;
+    --input: 214 24% 86%;
+    --ring: 45 93% 48%;
+
+    --radius: 0.5rem;
+
+    /* Custom semantic tokens */
+    --severity-low: 142 76% 36%;
+    --severity-medium: 45 93% 47%;
+    --severity-high: 25 95% 53%;
+    --severity-critical: 0 72% 51%;
+
+    --credible: 142 76% 36%;
+    --suspicious: 25 95% 53%;
+
+    --category-fraud: 280 65% 60%;
+    --category-violence: 0 72% 51%;
+    --category-corruption: 45 93% 47%;
+    --category-governance: 217 91% 60%;
+    --category-safety: 25 95% 53%;
+    --category-healthcare: 142 76% 36%;
+    --category-infrastructure: 199 89% 48%;
+    --category-other: 215 20% 55%;
+
+    --anonymous-accent: 280 65% 45%;
+    --shield-glow: 45 93% 48%;
+
+    --sidebar-background: 0 0% 100%;
+    --sidebar-foreground: 222 47% 11%;
+    --sidebar-primary: 45 93% 48%;
+    --sidebar-primary-foreground: 222 47% 10%;
+    --sidebar-accent: 210 24% 95%;
+    --sidebar-accent-foreground: 222 47% 12%;
+    --sidebar-border: 214 24% 86%;
+    --sidebar-ring: 45 93% 48%;
+  }
+
+  .dark {
     --background: 222 47% 6%;
     --foreground: 210 20% 95%;
 
@@ -33,26 +95,6 @@
     --border: 217 33% 18%;
     --input: 217 33% 18%;
     --ring: 45 93% 58%;
-
-    --radius: 0.5rem;
-
-    /* Custom semantic tokens */
-    --severity-low: 142 76% 36%;
-    --severity-medium: 45 93% 47%;
-    --severity-high: 25 95% 53%;
-    --severity-critical: 0 72% 51%;
-
-    --credible: 142 76% 36%;
-    --suspicious: 25 95% 53%;
-
-    --category-fraud: 280 65% 60%;
-    --category-violence: 0 72% 51%;
-    --category-corruption: 45 93% 47%;
-    --category-governance: 217 91% 60%;
-    --category-safety: 25 95% 53%;
-    --category-healthcare: 142 76% 36%;
-    --category-infrastructure: 199 89% 48%;
-    --category-other: 215 20% 55%;
 
     --anonymous-accent: 280 65% 60%;
     --shield-glow: 45 93% 58%;
