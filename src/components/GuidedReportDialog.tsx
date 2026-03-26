@@ -614,7 +614,7 @@ export function GuidedReportDialog({ onPostCreated }: GuidedReportDialogProps) {
           {currentStep === 'review' ? (
             <Button onClick={handleSubmit} disabled={isSubmitting} className="bg-primary hover:bg-primary/90 gap-2">
               <Shield className="h-4 w-4" />
-              {isSubmitting ? 'Submitting...' : 'Submit Report'}
+              {isSubmitting ? 'Posting...' : 'Post'}
             </Button>
           ) : (
             <Button

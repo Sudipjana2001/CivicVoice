@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -83,6 +83,9 @@ export function CommentsSection({
   const [pendingReactionIds, setPendingReactionIds] = useState<Record<string, boolean>>({});
   const [expandedThreadIds, setExpandedThreadIds] = useState<Record<string, boolean>>({});
   const [sortMode, setSortMode] = useState<'newest' | 'oldest'>('newest');
+  const [isMainComposerExpanded, setIsMainComposerExpanded] = useState(false);
+  const mainCommentTextareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const replyTextareaRef = useRef<HTMLTextAreaElement | null>(null);
 
   useEffect(() => {
     setCommentCount(initialCount);
@@ -94,11 +97,28 @@ export function CommentsSection({
     setReplyContent('');
     setEditingCommentId(null);
     setEditContent('');
+    setNewComment('');
+    setIsMainComposerExpanded(false);
   }, [postId]);
 
   useEffect(() => {
     onCountChange?.(commentCount);
   }, [commentCount, onCountChange]);
+
+  const autoResizeTextarea = useCallback((textarea: HTMLTextAreaElement | null) => {
+    if (!textarea) return;
+
+    textarea.style.height = '0px';
+    textarea.style.height = `${Math.min(Math.max(textarea.scrollHeight, 44), 220)}px`;
+  }, []);
+
+  useEffect(() => {
+    autoResizeTextarea(replyTextareaRef.current);
+  }, [replyingToCommentId, replyContent, autoResizeTextarea]);
+
+  useEffect(() => {
+    autoResizeTextarea(mainCommentTextareaRef.current);
+  }, [newComment, autoResizeTextarea]);
 
   const syncPostCommentCount = useCallback((nextCount: number) => {
     queryClient.setQueryData(['post', postId], (current: Record<string, unknown> | null | undefined) => {
@@ -331,6 +351,7 @@ export function CommentsSection({
       setComments((prev) => [data, ...prev]);
       applyCommentCount((current) => current + 1);
       setNewComment('');
+      setIsMainComposerExpanded(false);
       toast.success('Comment posted under your public pseudonym');
     } catch (error) {
       console.error('Error submitting comment:', error);
@@ -631,29 +652,47 @@ export function CommentsSection({
                 </div>
 
                 {isReplying && (
-                  <div className="mt-3 rounded-2xl border border-border/60 bg-muted/20 p-3">
-                    <Textarea
-                      value={replyContent}
-                      onChange={(e) => setReplyContent(e.target.value)}
-                      placeholder="Add a reply..."
-                      className="min-h-[82px] resize-none border-0 bg-transparent px-0 text-sm shadow-none focus-visible:ring-0"
-                    />
-                    <div className="mt-2 flex justify-end gap-2">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="rounded-full"
-                        onClick={() => {
-                          setReplyingToCommentId(null);
-                          setReplyContent('');
-                        }}
-                      >
-                        Cancel
-                      </Button>
-                      <Button size="sm" className="rounded-full" onClick={() => handleReplySubmit(comment)} disabled={!replyContent.trim() || isSubmittingReply}>
-                        {isSubmittingReply ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Send className="h-4 w-4 mr-1" />}
-                        Reply
-                      </Button>
+                  <div className="mt-4 flex items-start gap-3">
+                    <Avatar className="mt-1 h-9 w-9 shrink-0 ring-1 ring-border/40">
+                      <AvatarFallback className={`text-sm font-semibold ${getAvatarTone(user?.id ?? 'reply-user')}`}>
+                        {user?.email?.[0]?.toUpperCase() ?? 'U'}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="min-w-0 flex-1">
+                      <div className="border-b border-border/70 pb-2">
+                        <p className="mb-2 text-sm text-muted-foreground">
+                          Replying to <span className="font-medium text-foreground">@{comment.anonymous_id}</span>
+                        </p>
+                        <Textarea
+                          ref={replyTextareaRef}
+                          value={replyContent}
+                          onChange={(e) => {
+                            setReplyContent(e.target.value);
+                            autoResizeTextarea(e.currentTarget);
+                          }}
+                          placeholder={`Write a reply to ${comment.anonymous_id}...`}
+                          rows={1}
+                          autoFocus
+                          className="min-h-[44px] max-h-[220px] resize-none overflow-y-auto rounded-none border-0 bg-transparent px-0 py-1 text-[15px] leading-7 shadow-none focus-visible:ring-0 focus-visible:ring-offset-0"
+                        />
+                      </div>
+                      <div className="mt-3 flex justify-end gap-3">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="rounded-full px-4"
+                          onClick={() => {
+                            setReplyingToCommentId(null);
+                            setReplyContent('');
+                          }}
+                        >
+                          Cancel
+                        </Button>
+                        <Button size="sm" className="rounded-full px-5" onClick={() => handleReplySubmit(comment)} disabled={!replyContent.trim() || isSubmittingReply}>
+                          {isSubmittingReply ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : null}
+                          Reply
+                        </Button>
+                      </div>
                     </div>
                   </div>
                 )}
@@ -759,34 +798,58 @@ export function CommentsSection({
 
       <div className="border-t border-border/50 bg-background/95 px-4 py-3 backdrop-blur sm:px-5">
         {user ? (
-          <div className="flex items-end gap-3">
-            <Avatar className="h-10 w-10 shrink-0 ring-1 ring-border/40">
+          <div className="flex items-start gap-3">
+            <Avatar className="mt-1 h-10 w-10 shrink-0 ring-1 ring-border/40">
               <AvatarFallback className={`text-sm font-semibold ${getAvatarTone(user.id)}`}>
                 {user.email?.[0]?.toUpperCase() ?? 'U'}
               </AvatarFallback>
             </Avatar>
-            <div className="min-w-0 flex-1 rounded-3xl border border-border/60 bg-muted/20 px-4 py-2">
+            <div className="min-w-0 flex-1">
+              <div className="border-b border-border/70 transition-colors focus-within:border-foreground/40">
               <Textarea
+                ref={mainCommentTextareaRef}
                 value={newComment}
-                onChange={(e) => setNewComment(e.target.value)}
+                onChange={(e) => {
+                  setNewComment(e.target.value);
+                  autoResizeTextarea(e.currentTarget);
+                }}
+                onFocus={() => setIsMainComposerExpanded(true)}
                 placeholder="Add a comment..."
-                className="min-h-[42px] max-h-28 resize-none border-0 bg-transparent px-0 py-1 text-sm shadow-none focus-visible:ring-0"
+                rows={1}
+                className="min-h-[44px] max-h-[220px] resize-none overflow-y-auto rounded-none border-0 bg-transparent px-0 py-1 text-[15px] leading-7 shadow-none focus-visible:ring-0 focus-visible:ring-offset-0"
                 onKeyDown={(e) => {
-                  if (e.key === 'Enter' && !e.shiftKey) {
+                  if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
                     e.preventDefault();
                     handleSubmit();
                   }
                 }}
               />
+              </div>
+              {(isMainComposerExpanded || Boolean(newComment.trim())) && (
+                <div className="mt-3 flex justify-end gap-3">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="rounded-full px-4"
+                    onClick={() => {
+                      setNewComment('');
+                      setIsMainComposerExpanded(false);
+                    }}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    size="sm"
+                    onClick={handleSubmit}
+                    disabled={!newComment.trim() || isSubmitting}
+                    className="rounded-full px-5"
+                  >
+                    {isSubmitting ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : null}
+                    Comment
+                  </Button>
+                </div>
+              )}
             </div>
-            <Button
-              size="icon"
-              onClick={handleSubmit}
-              disabled={!newComment.trim() || isSubmitting}
-              className="h-11 w-11 shrink-0 rounded-full"
-            >
-              {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-            </Button>
           </div>
         ) : (
           <div className="flex items-center justify-center gap-2 py-1 text-sm text-muted-foreground">
