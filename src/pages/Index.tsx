@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef, useEffect, useCallback } from 'react';
+import { memo, useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { useInfiniteQuery, useQueryClient } from '@tanstack/react-query';
 import { Header } from '@/components/Header';
 import { FilterButton } from '@/components/FilterButton';
@@ -25,6 +25,119 @@ type SortOption = 'recent' | 'trending';
 
 const postService = PostService.getInstance();
 const POSTS_PAGE_SIZE = 10;
+
+type CachedPost = Post & { userId?: string };
+type InfinitePostsCache = {
+  pages: Array<{
+    posts: CachedPost[];
+    hasMore: boolean;
+  }>;
+  pageParams: unknown[];
+};
+
+interface PostWithCommentsProps {
+  post: Post;
+  eagerMedia: boolean;
+  isCommentsOpen: boolean;
+  onCommentsClick: (post: Post) => void;
+  onCloseComments: () => void;
+}
+
+function mergeRealtimePost(currentPost: CachedPost, row: Record<string, unknown>): CachedPost {
+  return {
+    ...currentPost,
+    anonymousId: typeof row.anonymous_id === 'string' ? row.anonymous_id : currentPost.anonymousId,
+    content: typeof row.content === 'string' ? row.content : currentPost.content,
+    category: typeof row.category === 'string' ? row.category as Category : currentPost.category,
+    severity: typeof row.severity === 'string' ? row.severity as Severity : currentPost.severity,
+    evidenceType: typeof row.evidence_type === 'string' ? row.evidence_type as Post['evidenceType'] : currentPost.evidenceType,
+    location: row.location === null ? undefined : typeof row.location === 'string' ? row.location : currentPost.location,
+    incidentDate: row.incident_date === null ? undefined : typeof row.incident_date === 'string' ? row.incident_date : currentPost.incidentDate,
+    incidentTime: row.incident_time === null ? undefined : typeof row.incident_time === 'string' ? row.incident_time : currentPost.incidentTime,
+    imageUrl: row.image_url === null ? undefined : typeof row.image_url === 'string' ? row.image_url : currentPost.imageUrl,
+    createdAt: typeof row.created_at === 'string' ? new Date(row.created_at) : currentPost.createdAt,
+    credibleVotes: typeof row.credible_votes === 'number' ? row.credible_votes : currentPost.credibleVotes,
+    suspiciousVotes: typeof row.suspicious_votes === 'number' ? row.suspicious_votes : currentPost.suspiciousVotes,
+    commentCount: typeof row.comment_count === 'number' ? row.comment_count : currentPost.commentCount,
+    reportCount: typeof row.report_count === 'number' ? row.report_count : currentPost.reportCount,
+    status: typeof row.status === 'string' ? row.status : currentPost.status,
+    selfDestructAt: row.self_destruct_at === null
+      ? undefined
+      : typeof row.self_destruct_at === 'string'
+        ? new Date(row.self_destruct_at)
+        : currentPost.selfDestructAt,
+    userId: row.user_id === null ? undefined : typeof row.user_id === 'string' ? row.user_id : currentPost.userId,
+  };
+}
+
+const PostWithComments = memo(function PostWithComments({
+  post,
+  eagerMedia,
+  isCommentsOpen,
+  onCommentsClick,
+  onCloseComments,
+}: PostWithCommentsProps) {
+  const postRef = useRef<HTMLDivElement>(null);
+  const [postHeight, setPostHeight] = useState<number | undefined>(undefined);
+  const [commentCount, setCommentCount] = useState(post.commentCount);
+
+  useEffect(() => {
+    setCommentCount(post.commentCount);
+  }, [post.commentCount]);
+
+  const syncPostHeight = useCallback(() => {
+    if (!postRef.current) return;
+    const nextHeight = Math.ceil(postRef.current.getBoundingClientRect().height);
+    setPostHeight((prev) => (prev === nextHeight ? prev : nextHeight));
+  }, []);
+
+  useEffect(() => {
+    if (!isCommentsOpen) {
+      setPostHeight(undefined);
+      return;
+    }
+
+    syncPostHeight();
+
+    let resizeObserver: ResizeObserver | null = null;
+    if (typeof ResizeObserver !== 'undefined' && postRef.current) {
+      resizeObserver = new ResizeObserver(() => {
+        syncPostHeight();
+      });
+      resizeObserver.observe(postRef.current);
+    }
+
+    const handleWindowResize = () => syncPostHeight();
+    window.addEventListener('resize', handleWindowResize);
+
+    return () => {
+      window.removeEventListener('resize', handleWindowResize);
+      resizeObserver?.disconnect();
+    };
+  }, [isCommentsOpen, syncPostHeight]);
+
+  return (
+    <div className={`grid items-start gap-4 ${isCommentsOpen ? 'grid-cols-2' : 'grid-cols-1 max-w-2xl mx-auto'}`}>
+      <div ref={postRef} className="self-start">
+        <EnhancedPostCard
+          post={{ ...post, commentCount }}
+          eagerMedia={eagerMedia}
+          onCommentsClick={onCommentsClick}
+          isCommentsOpen={isCommentsOpen}
+        />
+      </div>
+      {isCommentsOpen && (
+        <CommentsCard
+          postId={post.id}
+          commentCount={commentCount}
+          onCountChange={setCommentCount}
+          onClose={onCloseComments}
+          height={postHeight}
+        />
+      )}
+    </div>
+  );
+});
 
 export default function Index() {
   const isMobile = useIsMobile();
@@ -58,12 +171,53 @@ export default function Index() {
   const lastConsumedGateRef = useRef(0);
   const posts = useMemo(() => data?.pages.flatMap((page) => page.posts) ?? [], [data]);
 
+  const handleCommentsClick = useCallback((post: Post) => {
+    setSelectedPostId((current) => current === post.id ? null : post.id);
+  }, []);
+
+  const handleCloseComments = useCallback(() => {
+    setSelectedPostId(null);
+  }, []);
+
   // Real-time subscription for new posts
   useEffect(() => {
     const channel = supabase
       .channel('posts-realtime')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'posts' }, () => {
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'posts' }, () => {
         queryClient.invalidateQueries({ queryKey: ['posts'] });
+      })
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'posts' }, () => {
+        queryClient.invalidateQueries({ queryKey: ['posts'] });
+      })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'posts' }, (payload) => {
+        const row = payload.new as Record<string, unknown>;
+        const postId = typeof row.id === 'string' ? row.id : null;
+
+        if (!postId) {
+          return;
+        }
+
+        queryClient.setQueryData(['posts'], (current: InfinitePostsCache | undefined) => {
+          if (!current?.pages) {
+            return current;
+          }
+
+          return {
+            ...current,
+            pages: current.pages.map((page) => ({
+              ...page,
+              posts: page.posts.map((post) => post.id === postId ? mergeRealtimePost(post, row) : post),
+            })),
+          };
+        });
+
+        queryClient.setQueryData(['post', postId], (current: CachedPost | null | undefined) => {
+          if (!current) {
+            return current;
+          }
+
+          return mergeRealtimePost(current, row);
+        });
       })
       .subscribe();
 
@@ -277,88 +431,6 @@ export default function Index() {
 
     setFollowedTopics((prev) => prev.filter((t) => !(t.type === topic.type && t.value === topic.value)));
   };
-
-  const handleCommentsClick = (post: Post) => {
-    if (selectedPostId === post.id) {
-      setSelectedPostId(null);
-    } else {
-      setSelectedPostId(post.id);
-    }
-  };
-
-  const handleCloseComments = () => {
-    setSelectedPostId(null);
-  };
-
-  // Component to handle post + comments with height sync
-  function PostWithComments({ 
-    post, 
-    eagerMedia,
-    isCommentsOpen, 
-    onCommentsClick, 
-    onCloseComments 
-  }: { 
-    post: Post; 
-    eagerMedia: boolean;
-    isCommentsOpen: boolean; 
-    onCommentsClick: (post: Post) => void; 
-    onCloseComments: () => void;
-  }) {
-    const postRef = useRef<HTMLDivElement>(null);
-    const [postHeight, setPostHeight] = useState<number | undefined>(undefined);
-
-    const syncPostHeight = useCallback(() => {
-      if (!postRef.current) return;
-      const nextHeight = Math.ceil(postRef.current.getBoundingClientRect().height);
-      setPostHeight((prev) => (prev === nextHeight ? prev : nextHeight));
-    }, []);
-
-    useEffect(() => {
-      if (!isCommentsOpen) {
-        setPostHeight(undefined);
-        return;
-      }
-
-      syncPostHeight();
-
-      let resizeObserver: ResizeObserver | null = null;
-      if (typeof ResizeObserver !== 'undefined' && postRef.current) {
-        resizeObserver = new ResizeObserver(() => {
-          syncPostHeight();
-        });
-        resizeObserver.observe(postRef.current);
-      }
-
-      const handleWindowResize = () => syncPostHeight();
-      window.addEventListener('resize', handleWindowResize);
-
-      return () => {
-        window.removeEventListener('resize', handleWindowResize);
-        resizeObserver?.disconnect();
-      };
-    }, [isCommentsOpen, syncPostHeight]);
-
-    return (
-      <div className={`grid items-start gap-4 ${isCommentsOpen ? 'grid-cols-2' : 'grid-cols-1 max-w-2xl mx-auto'}`}>
-        <div ref={postRef} className="self-start">
-          <EnhancedPostCard 
-            post={post} 
-            eagerMedia={eagerMedia}
-            onCommentsClick={onCommentsClick}
-            isCommentsOpen={isCommentsOpen}
-          />
-        </div>
-        {isCommentsOpen && (
-          <CommentsCard 
-            postId={post.id} 
-            commentCount={post.commentCount}
-            onClose={onCloseComments}
-            height={postHeight}
-          />
-        )}
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen flex flex-col bg-background">

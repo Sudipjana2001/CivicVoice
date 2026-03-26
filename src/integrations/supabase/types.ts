@@ -135,27 +135,114 @@ export type Database = {
           anonymous_id: string
           content: string
           created_at: string
+          downvote_count: number
+          edited_at: string | null
           id: string
+          like_count: number
+          parent_comment_id: string | null
           post_id: string
+          upvote_count: number
+          updated_at: string
           user_id: string | null
         }
         Insert: {
           anonymous_id?: string
           content: string
           created_at?: string
+          downvote_count?: number
+          edited_at?: string | null
           id?: string
+          like_count?: number
+          parent_comment_id?: string | null
           post_id: string
+          upvote_count?: number
+          updated_at?: string
           user_id?: string | null
         }
         Update: {
           anonymous_id?: string
           content?: string
           created_at?: string
+          downvote_count?: number
+          edited_at?: string | null
           id?: string
+          like_count?: number
+          parent_comment_id?: string | null
           post_id?: string
+          upvote_count?: number
+          updated_at?: string
           user_id?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "comments_parent_comment_id_fkey"
+            columns: ["parent_comment_id"]
+            isOneToOne: false
+            referencedRelation: "comments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      comment_likes: {
+        Row: {
+          comment_id: string
+          created_at: string
+          id: string
+          user_id: string
+        }
+        Insert: {
+          comment_id: string
+          created_at?: string
+          id?: string
+          user_id: string
+        }
+        Update: {
+          comment_id?: string
+          created_at?: string
+          id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "comment_likes_comment_id_fkey"
+            columns: ["comment_id"]
+            isOneToOne: false
+            referencedRelation: "comments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      comment_reactions: {
+        Row: {
+          comment_id: string
+          created_at: string
+          id: string
+          reaction_type: string
+          user_id: string
+        }
+        Insert: {
+          comment_id: string
+          created_at?: string
+          id?: string
+          reaction_type: string
+          user_id: string
+        }
+        Update: {
+          comment_id?: string
+          created_at?: string
+          id?: string
+          reaction_type?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "comment_reactions_comment_id_fkey"
+            columns: ["comment_id"]
+            isOneToOne: false
+            referencedRelation: "comments"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       followed_topics: {
         Row: {
@@ -476,6 +563,109 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      create_comment_and_increment: {
+        Args: {
+          p_content: string
+          p_parent_comment_id?: string | null
+          p_post_id: string
+        }
+        Returns: Database["public"]["Tables"]["comments"]["Row"]
+      }
+      delete_own_comment_and_decrement: {
+        Args: {
+          p_comment_id: string
+        }
+        Returns: string
+      }
+      fetch_comment_replies_with_reaction_state: {
+        Args: {
+          p_parent_comment_ids: string[]
+        }
+        Returns: {
+          anonymous_id: string
+          content: string
+          created_at: string
+          downvote_count: number
+          edited_at: string | null
+          id: string
+          parent_comment_id: string | null
+          post_id: string
+          updated_at: string
+          upvote_count: number
+          user_id: string | null
+          viewer_reaction: string | null
+        }[]
+      }
+      fetch_comments_with_like_state: {
+        Args: {
+          p_before_created_at?: string | null
+          p_before_id?: string | null
+          p_limit?: number | null
+          p_post_id: string
+        }
+        Returns: {
+          anonymous_id: string
+          content: string
+          created_at: string
+          edited_at: string | null
+          id: string
+          like_count: number
+          post_id: string
+          updated_at: string
+          user_id: string | null
+          viewer_has_liked: boolean
+        }[]
+      }
+      fetch_comments_with_reaction_state: {
+        Args: {
+          p_before_created_at?: string | null
+          p_before_id?: string | null
+          p_limit?: number | null
+          p_post_id: string
+        }
+        Returns: {
+          anonymous_id: string
+          content: string
+          created_at: string
+          downvote_count: number
+          edited_at: string | null
+          id: string
+          parent_comment_id: string | null
+          post_id: string
+          updated_at: string
+          upvote_count: number
+          user_id: string | null
+          viewer_reaction: string | null
+        }[]
+      }
+      set_comment_reaction_state: {
+        Args: {
+          p_comment_id: string
+          p_reaction_type?: string | null
+        }
+        Returns: {
+          downvote_count: number
+          reaction: string | null
+          upvote_count: number
+        }[]
+      }
+      set_comment_like_state: {
+        Args: {
+          p_comment_id: string
+          p_like: boolean
+        }
+        Returns: {
+          like_count: number
+          liked: boolean
+        }[]
+      }
+      update_own_comment: {
+        Args: {
+          p_comment_id: string
+          p_content: string
+        }
+        Returns: Database["public"]["Tables"]["comments"]["Row"]
+      }
       upsert_post_media_asset: {
         Args: {
           p_card_path?: string | null

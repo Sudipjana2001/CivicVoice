@@ -55,11 +55,13 @@ export default function CommentsPage() {
   const [evidencePreviewVideoUrl, setEvidencePreviewVideoUrl] = useState<string | null>(null);
   const [evidenceViewerUrl, setEvidenceViewerUrl] = useState<string | null>(null);
   const [isEvidenceLoading, setIsEvidenceLoading] = useState(false);
+  const [commentCount, setCommentCount] = useState(0);
 
   useEffect(() => {
     if (post) {
       setCredibleVotes(post.credibleVotes);
       setSuspiciousVotes(post.suspiciousVotes);
+      setCommentCount(post.commentCount);
     }
   }, [post]);
 
@@ -431,8 +433,8 @@ export default function CommentsPage() {
         {/* Comments section */}
         <Card className="glass-card">
           <CardContent className="p-4">
-            <h2 className="text-sm font-semibold mb-4">Comments ({post.commentCount})</h2>
-            <CommentsSection postId={post.id} initialCount={post.commentCount} isFullPage />
+            <h2 className="text-sm font-semibold mb-4">Comments ({commentCount})</h2>
+            <CommentsSection postId={post.id} initialCount={commentCount} isFullPage onCountChange={setCommentCount} />
           </CardContent>
         </Card>
       </div>

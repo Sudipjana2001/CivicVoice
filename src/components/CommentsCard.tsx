@@ -8,9 +8,10 @@ interface CommentsCardProps {
   commentCount: number;
   onClose: () => void;
   height?: number;
+  onCountChange?: (count: number) => void;
 }
 
-export function CommentsCard({ postId, commentCount, onClose, height }: CommentsCardProps) {
+export function CommentsCard({ postId, commentCount, onClose, height, onCountChange }: CommentsCardProps) {
   return (
     <Card 
       className="glass-card overflow-hidden animate-fade-in"
@@ -29,7 +30,7 @@ export function CommentsCard({ postId, commentCount, onClose, height }: Comments
 
         {/* Comments content - scrollable area */}
         <div className="flex-1 overflow-y-auto p-4 min-h-0">
-          <CommentsSection postId={postId} initialCount={commentCount} />
+          <CommentsSection postId={postId} initialCount={commentCount} onCountChange={onCountChange} />
         </div>
       </CardContent>
     </Card>

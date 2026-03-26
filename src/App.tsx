@@ -14,7 +14,14 @@ import Profile from "./pages/Profile";
 import CommentsPage from "./pages/CommentsPage";
 import NotFound from "./pages/NotFound";
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 30_000,
+      refetchOnWindowFocus: false,
+    },
+  },
+});
 
 const AppRoutes = () => {
   const location = useLocation();
