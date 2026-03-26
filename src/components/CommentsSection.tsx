@@ -1,8 +1,9 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -21,6 +22,9 @@ import {
   Edit2,
   Trash2,
   Check,
+  ChevronDown,
+  ChevronUp,
+  ListFilter,
   X,
 } from 'lucide-react';
 import { CommentService } from '@/services/CommentService';
@@ -38,9 +42,27 @@ interface CommentsSectionProps {
   initialCount?: number;
   isFullPage?: boolean;
   onCountChange?: (count: number) => void;
+  showHeader?: boolean;
+  onClose?: () => void;
 }
 
-export function CommentsSection({ postId, initialCount = 0, isFullPage, onCountChange }: CommentsSectionProps) {
+const avatarToneClasses = [
+  'bg-rose-100 text-rose-700 dark:bg-rose-500/15 dark:text-rose-200',
+  'bg-sky-100 text-sky-700 dark:bg-sky-500/15 dark:text-sky-200',
+  'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-200',
+  'bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-200',
+  'bg-violet-100 text-violet-700 dark:bg-violet-500/15 dark:text-violet-200',
+  'bg-fuchsia-100 text-fuchsia-700 dark:bg-fuchsia-500/15 dark:text-fuchsia-200',
+];
+
+export function CommentsSection({
+  postId,
+  initialCount = 0,
+  isFullPage,
+  onCountChange,
+  showHeader = false,
+  onClose,
+}: CommentsSectionProps) {
   const { user } = useAuth();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -59,57 +81,24 @@ export function CommentsSection({ postId, initialCount = 0, isFullPage, onCountC
   const [replyContent, setReplyContent] = useState('');
   const [submittingReplyToCommentId, setSubmittingReplyToCommentId] = useState<string | null>(null);
   const [pendingReactionIds, setPendingReactionIds] = useState<Record<string, boolean>>({});
+  const [expandedThreadIds, setExpandedThreadIds] = useState<Record<string, boolean>>({});
+  const [sortMode, setSortMode] = useState<'newest' | 'oldest'>('newest');
 
   useEffect(() => {
     setCommentCount(initialCount);
   }, [initialCount, postId]);
 
   useEffect(() => {
-    onCountChange?.(commentCount);
-  }, [commentCount, onCountChange]);
-
-  const fetchInitialComments = useCallback(async () => {
-    setIsLoading(true);
-    try {
-      const page = await commentService.fetchByPostId(postId, {
-        limit: COMMENTS_PAGE_SIZE,
-      });
-
-      setComments(page.comments);
-      setHasMore(page.hasMore);
-    } catch (error) {
-      console.error('Error fetching comments:', error);
-      toast.error('Failed to load comments');
-    } finally {
-      setIsLoading(false);
-    }
+    setExpandedThreadIds({});
+    setReplyingToCommentId(null);
+    setReplyContent('');
+    setEditingCommentId(null);
+    setEditContent('');
   }, [postId]);
 
   useEffect(() => {
-    fetchInitialComments();
-  }, [fetchInitialComments]);
-
-  const handleLoadMore = async () => {
-    if (isLoadingMore || !hasMore || comments.length === 0) return;
-
-    const lastComment = comments[comments.length - 1];
-    setIsLoadingMore(true);
-    try {
-      const page = await commentService.fetchByPostId(postId, {
-        limit: COMMENTS_PAGE_SIZE,
-        beforeCreatedAt: lastComment.created_at,
-        beforeId: lastComment.id,
-      });
-
-      setComments((prev) => [...prev, ...page.comments]);
-      setHasMore(page.hasMore);
-    } catch (error) {
-      console.error('Error loading more comments:', error);
-      toast.error('Failed to load more comments');
-    } finally {
-      setIsLoadingMore(false);
-    }
-  };
+    onCountChange?.(commentCount);
+  }, [commentCount, onCountChange]);
 
   const syncPostCommentCount = useCallback((nextCount: number) => {
     queryClient.setQueryData(['post', postId], (current: Record<string, unknown> | null | undefined) => {
@@ -145,6 +134,53 @@ export function CommentsSection({ postId, initialCount = 0, isFullPage, onCountC
     });
   }, [postId, queryClient]);
 
+  const fetchInitialComments = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const page = await commentService.fetchByPostId(postId, {
+        limit: COMMENTS_PAGE_SIZE,
+      });
+
+      setComments(page.comments);
+      setHasMore(page.hasMore);
+      setCommentCount(page.totalCount);
+      syncPostCommentCount(page.totalCount);
+    } catch (error) {
+      console.error('Error fetching comments:', error);
+      toast.error('Failed to load comments');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [postId, syncPostCommentCount]);
+
+  useEffect(() => {
+    fetchInitialComments();
+  }, [fetchInitialComments]);
+
+  const handleLoadMore = async () => {
+    if (isLoadingMore || !hasMore || comments.length === 0) return;
+
+    const lastComment = comments[comments.length - 1];
+    setIsLoadingMore(true);
+    try {
+      const page = await commentService.fetchByPostId(postId, {
+        limit: COMMENTS_PAGE_SIZE,
+        beforeCreatedAt: lastComment.created_at,
+        beforeId: lastComment.id,
+      });
+
+      setComments((prev) => [...prev, ...page.comments]);
+      setHasMore(page.hasMore);
+      setCommentCount(page.totalCount);
+      syncPostCommentCount(page.totalCount);
+    } catch (error) {
+      console.error('Error loading more comments:', error);
+      toast.error('Failed to load more comments');
+    } finally {
+      setIsLoadingMore(false);
+    }
+  };
+
   const applyCommentCount = useCallback((updater: (current: number) => number) => {
     setCommentCount((current) => {
       const nextCount = Math.max(0, updater(current));
@@ -152,6 +188,25 @@ export function CommentsSection({ postId, initialCount = 0, isFullPage, onCountC
       return nextCount;
     });
   }, [syncPostCommentCount]);
+
+  const orderedComments = useMemo(() => {
+    const nextComments = [...comments];
+    nextComments.sort((left, right) => {
+      const diff = new Date(right.created_at).getTime() - new Date(left.created_at).getTime();
+      return sortMode === 'newest' ? diff : -diff;
+    });
+    return nextComments;
+  }, [comments, sortMode]);
+
+  const getAvatarFallback = (anonymousId: string) => {
+    const normalized = anonymousId.replace(/^CVC-/, '').trim();
+    return (normalized[0] ?? anonymousId[0] ?? 'C').toUpperCase();
+  };
+
+  const getAvatarTone = (anonymousId: string) => {
+    const seed = anonymousId.split('').reduce((total, character) => total + character.charCodeAt(0), 0);
+    return avatarToneClasses[seed % avatarToneClasses.length];
+  };
 
   const countCommentTree = (comment: CommentRow): number => (
     1 + comment.replies.reduce((total, reply) => total + countCommentTree(reply), 0)
@@ -248,6 +303,15 @@ export function CommentsSection({ postId, initialCount = 0, isFullPage, onCountC
     return { upvoteCount, downvoteCount };
   };
 
+  const getReplyCount = (comment: CommentRow) => countCommentTree(comment) - 1;
+
+  const toggleThread = (commentId: string) => {
+    setExpandedThreadIds((prev) => ({
+      ...prev,
+      [commentId]: !(prev[commentId] ?? false),
+    }));
+  };
+
   const handleSubmit = async () => {
     if (!user) {
       toast.error('Please sign in to comment', {
@@ -312,11 +376,14 @@ export function CommentsSection({ postId, initialCount = 0, isFullPage, onCountC
     }
 
     setDeletingCommentId(commentId);
+    const wasTopLevelComment = comments.some((comment) => comment.id === commentId);
     try {
       await commentService.delete(commentId);
       setComments((prev) => {
-        const { nextComments, removedCount } = removeCommentFromTree(prev, commentId);
-        applyCommentCount((current) => current - removedCount);
+        const { nextComments } = removeCommentFromTree(prev, commentId);
+        if (wasTopLevelComment) {
+          applyCommentCount((current) => current - 1);
+        }
         return nextComments;
       });
       toast.success('Comment deleted');
@@ -345,7 +412,7 @@ export function CommentsSection({ postId, initialCount = 0, isFullPage, onCountC
     try {
       const reply = await commentService.create(postId, replyContent, parentComment.id);
       setComments((prev) => insertReplyInTree(prev, parentComment.id, reply));
-      applyCommentCount((current) => current + 1);
+      setExpandedThreadIds((prev) => ({ ...prev, [parentComment.id]: true }));
       setReplyingToCommentId(null);
       setReplyContent('');
       toast.success('Reply posted under your public pseudonym');
@@ -425,235 +492,257 @@ export function CommentsSection({ postId, initialCount = 0, isFullPage, onCountC
     const isDeleting = deletingCommentId === comment.id;
     const isReplying = replyingToCommentId === comment.id;
     const isSubmittingReply = submittingReplyToCommentId === comment.id;
+    const replyCount = getReplyCount(comment);
+    const isThreadExpanded = expandedThreadIds[comment.id] ?? false;
+    const avatarSize = depth === 0 ? 'h-10 w-10' : 'h-8 w-8';
+    const threadIndent = depth === 0 ? '' : 'ml-4 pl-4 border-l border-border/40';
 
     return (
-      <div key={comment.id} className={`rounded-lg border border-border/50 bg-muted/30 p-3 ${depth === 0 ? 'cv-stagger-enter' : ''}`}>
-        <div className="flex items-start justify-between gap-3 mb-2">
-          <div className="flex items-center flex-wrap gap-2">
-            <span className="text-xs font-medium anonymous-id">{comment.anonymous_id}</span>
-            <span className="text-xs text-muted-foreground flex items-center gap-1">
-              <Clock className="h-3 w-3" />
-              {formatDistanceToNow(new Date(comment.created_at), { addSuffix: true })}
-            </span>
-            {comment.edited_at && (
-              <span className="text-[11px] uppercase tracking-wide text-muted-foreground/80">
-                Edited
-              </span>
-            )}
-          </div>
+      <div key={comment.id} className={threadIndent}>
+        <div className="flex items-start gap-3">
+          <Avatar className={`${avatarSize} shrink-0 ring-1 ring-border/40`}>
+            <AvatarFallback className={`text-sm font-semibold ${getAvatarTone(comment.anonymous_id)}`}>
+              {getAvatarFallback(comment.anonymous_id)}
+            </AvatarFallback>
+          </Avatar>
 
-          {isOwner && !isEditing && (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground">
-                  <MoreVertical className="h-4 w-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={() => handleStartEdit(comment)}>
-                  <Edit2 className="h-4 w-4 mr-2" />
-                  Edit comment
-                </DropdownMenuItem>
-                <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => handleDelete(comment.id)}>
-                  <Trash2 className="h-4 w-4 mr-2" />
-                  Delete comment
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          )}
-        </div>
-
-        {isEditing ? (
-          <div className="space-y-2">
-            <Textarea
-              value={editContent}
-              onChange={(e) => setEditContent(e.target.value)}
-              className="min-h-[80px] resize-none bg-background/60 border-border text-sm"
-              autoFocus
-            />
-            <div className="flex justify-end gap-2">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => {
-                  setEditingCommentId(null);
-                  setEditContent('');
-                }}
-              >
-                <X className="h-4 w-4 mr-1" />
-                Cancel
-              </Button>
-              <Button size="sm" onClick={handleSaveEdit} disabled={!editContent.trim() || isSaving}>
-                {isSaving ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Check className="h-4 w-4 mr-1" />}
-                Save
-              </Button>
-            </div>
-          </div>
-        ) : (
-          <>
-            <p className="text-sm text-foreground/90 whitespace-pre-wrap">{comment.content}</p>
-
-            <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
-              <div className="flex items-center gap-1">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => handleReactionClick(comment, 'upvote')}
-                  disabled={isReactionPending || isDeleting || (Boolean(user?.id) && comment.user_id === user.id)}
-                  className={`px-2 h-8 cv-interactive ${comment.viewer_reaction === 'upvote' ? 'text-credible bg-credible/10 hover:bg-credible/15' : 'text-muted-foreground hover:text-credible'}`}
-                >
-                  {isReactionPending && comment.viewer_reaction === 'upvote' ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <ThumbsUp className={`h-4 w-4 ${comment.viewer_reaction === 'upvote' ? 'fill-current' : ''}`} />
+          <div className="min-w-0 flex-1 pb-1">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                  <span className="font-semibold text-sm text-foreground truncate max-w-full">
+                    {comment.anonymous_id}
+                  </span>
+                  <span className="text-xs text-muted-foreground">
+                    {formatDistanceToNow(new Date(comment.created_at), { addSuffix: true })}
+                  </span>
+                  {comment.edited_at && (
+                    <span className="text-[11px] text-muted-foreground uppercase tracking-wide">
+                      Edited
+                    </span>
                   )}
-                  <span className="text-xs ml-1">{comment.upvote_count}</span>
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => handleReactionClick(comment, 'downvote')}
-                  disabled={isReactionPending || isDeleting || (Boolean(user?.id) && comment.user_id === user.id)}
-                  className={`px-2 h-8 cv-interactive ${comment.viewer_reaction === 'downvote' ? 'text-suspicious bg-suspicious/10 hover:bg-suspicious/15' : 'text-muted-foreground hover:text-suspicious'}`}
-                >
-                  {isReactionPending && comment.viewer_reaction === 'downvote' ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <ThumbsDown className={`h-4 w-4 ${comment.viewer_reaction === 'downvote' ? 'fill-current' : ''}`} />
-                  )}
-                  <span className="text-xs ml-1">{comment.downvote_count}</span>
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="px-2 h-8 text-muted-foreground hover:text-foreground cv-interactive"
-                  onClick={() => {
-                    setEditingCommentId(null);
-                    setEditContent('');
-                    setReplyingToCommentId((current) => current === comment.id ? null : comment.id);
-                    setReplyContent('');
-                  }}
-                >
-                  <Reply className="h-4 w-4" />
-                  <span className="text-xs ml-1">Reply</span>
-                </Button>
+                </div>
               </div>
 
-              {isDeleting && (
-                <span className="text-xs text-muted-foreground flex items-center gap-1">
-                  <Loader2 className="h-3 w-3 animate-spin" />
-                  Deleting...
-                </span>
+              {isOwner && !isEditing && (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0 rounded-full text-muted-foreground hover:bg-muted/70">
+                      <MoreVertical className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={() => handleStartEdit(comment)}>
+                      <Edit2 className="h-4 w-4 mr-2" />
+                      Edit comment
+                    </DropdownMenuItem>
+                    <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => handleDelete(comment.id)}>
+                      <Trash2 className="h-4 w-4 mr-2" />
+                      Delete comment
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               )}
             </div>
 
-            {isReplying && (
-              <div className="mt-3 rounded-lg border border-border/50 bg-background/40 p-3 space-y-2">
+            {isEditing ? (
+              <div className="mt-2 space-y-2">
                 <Textarea
-                  value={replyContent}
-                  onChange={(e) => setReplyContent(e.target.value)}
-                  placeholder="Reply to this comment..."
-                  className="min-h-[72px] resize-none bg-background/70 border-border text-sm"
+                  value={editContent}
+                  onChange={(e) => setEditContent(e.target.value)}
+                  className="min-h-[92px] resize-none rounded-2xl border-border/60 bg-background text-sm"
+                  autoFocus
                 />
                 <div className="flex justify-end gap-2">
                   <Button
                     variant="ghost"
                     size="sm"
+                    className="rounded-full"
                     onClick={() => {
-                      setReplyingToCommentId(null);
-                      setReplyContent('');
+                      setEditingCommentId(null);
+                      setEditContent('');
                     }}
                   >
+                    <X className="h-4 w-4 mr-1" />
                     Cancel
                   </Button>
-                  <Button size="sm" onClick={() => handleReplySubmit(comment)} disabled={!replyContent.trim() || isSubmittingReply}>
-                    {isSubmittingReply ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Send className="h-4 w-4 mr-1" />}
-                    Reply
+                  <Button size="sm" className="rounded-full" onClick={handleSaveEdit} disabled={!editContent.trim() || isSaving}>
+                    {isSaving ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Check className="h-4 w-4 mr-1" />}
+                    Save
                   </Button>
                 </div>
               </div>
-            )}
+            ) : (
+              <>
+                <p className="mt-1 text-[15px] leading-6 text-foreground whitespace-pre-wrap break-words">
+                  {comment.content}
+                </p>
 
-            {comment.replies.length > 0 && (
-              <div className="mt-3 pl-4 border-l border-border/60 space-y-2">
-                {comment.replies.map((reply) => renderComment(reply, depth + 1))}
-              </div>
+                <div className="mt-2 flex flex-wrap items-center gap-1 text-sm">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleReactionClick(comment, 'upvote')}
+                    disabled={isReactionPending || isDeleting || (Boolean(user?.id) && comment.user_id === user.id)}
+                    className={`h-8 rounded-full px-2 text-muted-foreground hover:bg-muted/60 ${comment.viewer_reaction === 'upvote' ? 'text-foreground' : ''}`}
+                  >
+                    {isReactionPending && comment.viewer_reaction === 'upvote' ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <ThumbsUp className={`h-4 w-4 ${comment.viewer_reaction === 'upvote' ? 'fill-current' : ''}`} />
+                    )}
+                    <span className="ml-2 text-sm">{comment.upvote_count}</span>
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleReactionClick(comment, 'downvote')}
+                    disabled={isReactionPending || isDeleting || (Boolean(user?.id) && comment.user_id === user.id)}
+                    className={`h-8 rounded-full px-2 text-muted-foreground hover:bg-muted/60 ${comment.viewer_reaction === 'downvote' ? 'text-foreground' : ''}`}
+                  >
+                    {isReactionPending && comment.viewer_reaction === 'downvote' ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <ThumbsDown className={`h-4 w-4 ${comment.viewer_reaction === 'downvote' ? 'fill-current' : ''}`} />
+                    )}
+                    <span className="ml-2 text-sm">{comment.downvote_count}</span>
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-8 rounded-full px-3 font-medium text-muted-foreground hover:bg-muted/60 hover:text-foreground"
+                    onClick={() => {
+                      setEditingCommentId(null);
+                      setEditContent('');
+                      setReplyingToCommentId((current) => current === comment.id ? null : comment.id);
+                      setReplyContent('');
+                      setExpandedThreadIds((prev) => ({ ...prev, [comment.id]: true }));
+                    }}
+                  >
+                    Reply
+                  </Button>
+
+                  {isDeleting && (
+                    <span className="ml-2 inline-flex items-center gap-1 text-xs text-muted-foreground">
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                      Deleting...
+                    </span>
+                  )}
+                </div>
+
+                {isReplying && (
+                  <div className="mt-3 rounded-2xl border border-border/60 bg-muted/20 p-3">
+                    <Textarea
+                      value={replyContent}
+                      onChange={(e) => setReplyContent(e.target.value)}
+                      placeholder="Add a reply..."
+                      className="min-h-[82px] resize-none border-0 bg-transparent px-0 text-sm shadow-none focus-visible:ring-0"
+                    />
+                    <div className="mt-2 flex justify-end gap-2">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="rounded-full"
+                        onClick={() => {
+                          setReplyingToCommentId(null);
+                          setReplyContent('');
+                        }}
+                      >
+                        Cancel
+                      </Button>
+                      <Button size="sm" className="rounded-full" onClick={() => handleReplySubmit(comment)} disabled={!replyContent.trim() || isSubmittingReply}>
+                        {isSubmittingReply ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Send className="h-4 w-4 mr-1" />}
+                        Reply
+                      </Button>
+                    </div>
+                  </div>
+                )}
+
+                {comment.replies.length > 0 && (
+                  <div className="mt-2">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 rounded-full px-2 font-semibold text-sm text-primary hover:bg-primary/10"
+                      onClick={() => toggleThread(comment.id)}
+                    >
+                      {isThreadExpanded ? <ChevronUp className="mr-1 h-4 w-4" /> : <ChevronDown className="mr-1 h-4 w-4" />}
+                      {replyCount} {replyCount === 1 ? 'reply' : 'replies'}
+                    </Button>
+
+                    {isThreadExpanded && (
+                      <div className="mt-3 space-y-5">
+                        {comment.replies.map((reply) => renderComment(reply, depth + 1))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </>
             )}
-          </>
-        )}
+          </div>
+        </div>
       </div>
     );
   };
 
-  return (
-    <div className={`flex flex-col ${isFullPage ? 'h-auto' : 'h-full'}`}>
-      <div className="p-3 border-b border-border/50">
-        {user ? (
-          <div className="flex gap-2">
-            <Textarea
-              value={newComment}
-              onChange={(e) => setNewComment(e.target.value)}
-              placeholder="Add an anonymous comment..."
-              className="min-h-[60px] resize-none bg-muted/50 border-border text-sm"
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && !e.shiftKey) {
-                  e.preventDefault();
-                  handleSubmit();
-                }
-              }}
-            />
-            <Button
-              size="icon"
-              onClick={handleSubmit}
-              disabled={!newComment.trim() || isSubmitting}
-              className="flex-shrink-0 cv-interactive"
-            >
-              {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-            </Button>
-          </div>
-        ) : (
-          <div className="flex items-center justify-center gap-2 py-2 text-sm text-muted-foreground">
-            <LogIn className="h-4 w-4" />
-            <span>
-              <button
-                onClick={() => navigate('/auth')}
-                className="text-primary hover:underline font-medium"
-              >
-                Sign in
-              </button>{' '}
-              to post a comment
-            </span>
-          </div>
-        )}
-      </div>
+  const showInitialSkeleton = isLoading && comments.length === 0;
 
-      <ScrollArea className={isFullPage ? 'h-auto' : 'flex-1'}>
-        <div className="p-3 space-y-3">
-          {isLoading ? (
-            <div className="space-y-3 py-2">
-              {Array.from({ length: 3 }).map((_, idx) => (
-                <div key={idx} className="p-3 rounded-lg bg-muted/30 border border-border/50 space-y-2 cv-stagger-enter" style={{ animationDelay: `${idx * 50}ms` }}>
-                  <div className="h-3 w-32 rounded cv-shimmer" />
-                  <div className="h-3 w-full rounded cv-shimmer" />
-                  <div className="h-3 w-3/4 rounded cv-shimmer" />
+  return (
+    <div className={`flex flex-col bg-background ${isFullPage ? 'h-auto' : 'h-full'}`}>
+      {showHeader && (
+        <div className="flex items-center justify-between border-b border-border/50 px-5 py-4">
+          <div className="flex items-end gap-2">
+            <h3 className="text-[2rem] font-bold leading-none text-foreground">Comments</h3>
+            <span className="pb-0.5 text-lg font-medium text-muted-foreground">{commentCount}</span>
+          </div>
+          <div className="flex items-center gap-1">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-10 w-10 rounded-full"
+              onClick={() => setSortMode((current) => current === 'newest' ? 'oldest' : 'newest')}
+              title={sortMode === 'newest' ? 'Showing newest first' : 'Showing oldest first'}
+            >
+              <ListFilter className="h-5 w-5" />
+            </Button>
+            {onClose && (
+              <Button variant="ghost" size="icon" className="h-10 w-10 rounded-full" onClick={onClose}>
+                <X className="h-5 w-5" />
+              </Button>
+            )}
+          </div>
+        </div>
+      )}
+
+      <ScrollArea className={isFullPage ? 'h-auto' : 'flex-1 min-h-0'}>
+        <div className="px-4 py-5 sm:px-5 sm:py-6">
+          {showInitialSkeleton ? (
+            <div className="space-y-6">
+              {Array.from({ length: 4 }).map((_, idx) => (
+                <div key={idx} className="flex gap-3">
+                  <div className="h-10 w-10 shrink-0 rounded-full cv-shimmer" />
+                  <div className="min-w-0 flex-1 space-y-2 pt-1">
+                    <div className="h-3 w-40 rounded cv-shimmer" />
+                    <div className="h-4 w-full rounded cv-shimmer" />
+                    <div className="h-4 w-3/4 rounded cv-shimmer" />
+                    <div className="h-8 w-36 rounded-full cv-shimmer" />
+                  </div>
                 </div>
               ))}
             </div>
-          ) : comments.length === 0 ? (
-            <p className="text-center text-sm text-muted-foreground py-4">
-              No comments yet. Be the first to comment!
-            </p>
+          ) : orderedComments.length === 0 ? (
+            <div className="py-10 text-center">
+              <p className="text-sm text-muted-foreground">No comments yet. Be the first to comment.</p>
+            </div>
           ) : (
-            comments.map((comment, idx) => (
-              <div key={comment.id} className="cv-stagger-enter" style={{ animationDelay: `${Math.min(idx * 35, 350)}ms` }}>
-                {renderComment(comment)}
-              </div>
-            ))
+            <div className="space-y-6">
+              {orderedComments.map((comment) => renderComment(comment))}
+            </div>
           )}
 
           {hasMore && (
-            <div className="pt-2 flex justify-center">
-              <Button variant="outline" size="sm" onClick={handleLoadMore} disabled={isLoadingMore}>
+            <div className="pt-5 flex justify-center">
+              <Button variant="outline" size="sm" className="rounded-full" onClick={handleLoadMore} disabled={isLoadingMore}>
                 {isLoadingMore ? (
                   <>
                     <Loader2 className="h-4 w-4 mr-2 animate-spin" />
@@ -667,6 +756,50 @@ export function CommentsSection({ postId, initialCount = 0, isFullPage, onCountC
           )}
         </div>
       </ScrollArea>
+
+      <div className="border-t border-border/50 bg-background/95 px-4 py-3 backdrop-blur sm:px-5">
+        {user ? (
+          <div className="flex items-end gap-3">
+            <Avatar className="h-10 w-10 shrink-0 ring-1 ring-border/40">
+              <AvatarFallback className={`text-sm font-semibold ${getAvatarTone(user.id)}`}>
+                {user.email?.[0]?.toUpperCase() ?? 'U'}
+              </AvatarFallback>
+            </Avatar>
+            <div className="min-w-0 flex-1 rounded-3xl border border-border/60 bg-muted/20 px-4 py-2">
+              <Textarea
+                value={newComment}
+                onChange={(e) => setNewComment(e.target.value)}
+                placeholder="Add a comment..."
+                className="min-h-[42px] max-h-28 resize-none border-0 bg-transparent px-0 py-1 text-sm shadow-none focus-visible:ring-0"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    handleSubmit();
+                  }
+                }}
+              />
+            </div>
+            <Button
+              size="icon"
+              onClick={handleSubmit}
+              disabled={!newComment.trim() || isSubmitting}
+              className="h-11 w-11 shrink-0 rounded-full"
+            >
+              {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+            </Button>
+          </div>
+        ) : (
+          <div className="flex items-center justify-center gap-2 py-1 text-sm text-muted-foreground">
+            <LogIn className="h-4 w-4" />
+            <span>
+              <button onClick={() => navigate('/auth')} className="font-medium text-primary hover:underline">
+                Sign in
+              </button>{' '}
+              to add a comment
+            </span>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

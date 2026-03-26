@@ -12,6 +12,7 @@ export interface CommentRow extends CommentRecord {
 export interface CommentPage {
   comments: CommentRow[];
   hasMore: boolean;
+  totalCount: number;
 }
 
 export interface CommentCursor {
@@ -76,14 +77,25 @@ export class CommentService {
   /** Fetch a page of top-level comments plus all nested replies for those threads. */
   async fetchByPostId(postId: string, cursor: CommentCursor = {}): Promise<CommentPage> {
     const pageSize = cursor.limit ?? CommentService.DEFAULT_PAGE_SIZE;
-    const { data, error } = await supabase.rpc('fetch_comments_with_reaction_state', {
-      p_post_id: postId,
-      p_limit: pageSize + 1,
-      p_before_created_at: cursor.beforeCreatedAt ?? null,
-      p_before_id: cursor.beforeId ?? null,
-    });
+    const [
+      { data, error },
+      { count, error: countError },
+    ] = await Promise.all([
+      supabase.rpc('fetch_comments_with_reaction_state', {
+        p_post_id: postId,
+        p_limit: pageSize + 1,
+        p_before_created_at: cursor.beforeCreatedAt ?? null,
+        p_before_id: cursor.beforeId ?? null,
+      }),
+      supabase
+        .from('comments')
+        .select('id', { count: 'exact', head: true })
+        .eq('post_id', postId)
+        .is('parent_comment_id', null),
+    ]);
 
     if (error) throw error;
+    if (countError) throw countError;
 
     const topRows = ((data as Array<CommentRecord & { viewer_reaction: CommentReaction }> | null) || []).map((row) =>
       this.mapCommentRecord(row as CommentRecord, row.viewer_reaction ?? null)
@@ -108,6 +120,7 @@ export class CommentService {
     return {
       comments: this.buildCommentTree(pagedTopRows, replyRows),
       hasMore: topRows.length > pageSize,
+      totalCount: count ?? 0,
     };
   }
 

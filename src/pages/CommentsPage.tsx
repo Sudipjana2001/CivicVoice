@@ -431,9 +431,8 @@ export default function CommentsPage() {
         </Card>
 
         {/* Comments section */}
-        <Card className="glass-card">
-          <CardContent className="p-4">
-            <h2 className="text-sm font-semibold mb-4">Comments ({commentCount})</h2>
+        <Card className="glass-card overflow-hidden">
+          <CardContent className="p-0">
             <CommentsSection postId={post.id} initialCount={commentCount} isFullPage onCountChange={setCommentCount} />
           </CardContent>
         </Card>
