@@ -72,7 +72,7 @@ function isProfileTab(value: string | null): value is ProfileTab {
 }
 
 export default function Profile() {
-  const { user, loading: authLoading, signOut } = useAuth();
+  const { user, loading: authLoading, signOut, isAdmin, adminRole } = useAuth();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const { toast } = useToast();
@@ -342,6 +342,22 @@ export default function Profile() {
             </div>
           </CardHeader>
         </Card>
+
+        {isAdmin && (
+          <Card className="mb-6 border-primary/30 bg-primary/5">
+            <CardContent className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="text-sm font-semibold text-foreground">Admin tools enabled</p>
+                <p className="text-sm text-muted-foreground mt-1">
+                  You currently have {adminRole?.replace('_', ' ')} access. Open the admin panel to moderate posts, comments, and user messages.
+                </p>
+              </div>
+              <Button onClick={() => navigate('/admin')} className="cv-interactive">
+                Open Admin Panel
+              </Button>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Profile Tabs */}
         <Tabs

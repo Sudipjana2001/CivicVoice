@@ -1,16 +1,21 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
+import { AdminService, type AdminRole } from '@/services/AdminService';
 
 interface AuthContextType {
   user: User | null;
   session: Session | null;
   loading: boolean;
+  adminRole: AdminRole | null;
+  isAdmin: boolean;
+  adminLoading: boolean;
   signUp: (email: string, password: string) => Promise<{ error: Error | null }>;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signInWithGoogle: () => Promise<{ error: Error | null }>;
   resetPassword: (email: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
+  refreshAdminAccess: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -19,6 +24,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
+  const [adminRole, setAdminRole] = useState<AdminRole | null>(null);
+  const [adminLoading, setAdminLoading] = useState(true);
+
+  const refreshAdminAccess = async () => {
+    const {
+      data: { session: nextSession },
+    } = await supabase.auth.getSession();
+
+    if (!nextSession?.user) {
+      setAdminRole(null);
+      setAdminLoading(false);
+      return;
+    }
+
+    setAdminLoading(true);
+
+    try {
+      const access = await AdminService.getInstance().getMyAccess();
+      setAdminRole(access.role);
+    } catch (error) {
+      console.error('Failed to load admin access:', error);
+      setAdminRole(null);
+    } finally {
+      setAdminLoading(false);
+    }
+  };
 
   useEffect(() => {
     // Set up auth state listener FIRST
@@ -27,6 +58,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setSession(session);
         setUser(session?.user ?? null);
         setLoading(false);
+
+        if (!session?.user) {
+          setAdminRole(null);
+          setAdminLoading(false);
+          return;
+        }
+
+        setAdminLoading(true);
+        void AdminService.getInstance()
+          .getMyAccess()
+          .then((access) => {
+            setAdminRole(access.role);
+          })
+          .catch((error) => {
+            console.error('Failed to load admin access:', error);
+            setAdminRole(null);
+          })
+          .finally(() => {
+            setAdminLoading(false);
+          });
       }
     );
 
@@ -35,6 +86,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setSession(session);
       setUser(session?.user ?? null);
       setLoading(false);
+
+      if (!session?.user) {
+        setAdminRole(null);
+        setAdminLoading(false);
+        return;
+      }
+
+      setAdminLoading(true);
+      AdminService.getInstance()
+        .getMyAccess()
+        .then((access) => {
+          setAdminRole(access.role);
+        })
+        .catch((error) => {
+          console.error('Failed to load admin access:', error);
+          setAdminRole(null);
+        })
+        .finally(() => {
+          setAdminLoading(false);
+        });
     });
 
     return () => subscription.unsubscribe();
@@ -83,7 +154,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, session, loading, signUp, signIn, signInWithGoogle, resetPassword, signOut }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        session,
+        loading,
+        adminRole,
+        isAdmin: adminRole !== null,
+        adminLoading,
+        signUp,
+        signIn,
+        signInWithGoogle,
+        resetPassword,
+        signOut,
+        refreshAdminAccess,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );

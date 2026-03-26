@@ -130,6 +130,27 @@ export type Database = {
         }
         Relationships: []
       }
+      admin_users: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          role: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          role: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          role?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       comments: {
         Row: {
           anonymous_id: string
@@ -563,6 +584,172 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      admin_delete_comment: {
+        Args: {
+          p_comment_id: string
+        }
+        Returns: string
+      }
+      admin_delete_post: {
+        Args: {
+          p_post_id: string
+        }
+        Returns: string
+      }
+      admin_get_dashboard_summary: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          active_admins: number
+          open_reports: number
+          reviewing_reports: number
+          total_comments: number
+          total_posts: number
+          total_users: number
+          under_review_posts: number
+        }[]
+      }
+      admin_list_admin_users: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          anonymous_id: string | null
+          created_at: string
+          created_by: string | null
+          created_by_anonymous_id: string | null
+          role: string
+          user_id: string
+        }[]
+      }
+      admin_list_comments: {
+        Args: {
+          p_limit?: number | null
+          p_search?: string | null
+        }
+        Returns: {
+          anonymous_id: string
+          content: string
+          created_at: string
+          direct_reply_count: number
+          edited_at: string | null
+          id: string
+          parent_comment_id: string | null
+          post_anonymous_id: string
+          post_excerpt: string
+          post_id: string
+          upvote_count: number
+          downvote_count: number
+          user_id: string | null
+        }[]
+      }
+      admin_list_post_reports: {
+        Args: {
+          p_limit?: number | null
+          p_search?: string | null
+          p_status?: string | null
+        }
+        Returns: {
+          created_at: string
+          details: string | null
+          id: string
+          post_anonymous_id: string
+          post_excerpt: string
+          post_id: string
+          post_status: string
+          reason: string
+          reporter_anonymous_id: string | null
+          reporter_user_id: string
+          status: string
+        }[]
+      }
+      admin_list_posts: {
+        Args: {
+          p_limit?: number | null
+          p_search?: string | null
+          p_status?: string | null
+        }
+        Returns: {
+          anonymous_id: string
+          category: string
+          comment_count: number
+          content: string
+          created_at: string
+          credible_votes: number
+          evidence_type: string | null
+          id: string
+          incident_date: string | null
+          incident_time: string | null
+          location: string | null
+          report_count: number
+          self_destruct_at: string | null
+          severity: string
+          status: string
+          suspicious_votes: number
+          user_id: string | null
+        }[]
+      }
+      admin_list_profiles: {
+        Args: {
+          p_limit?: number | null
+          p_search?: string | null
+        }
+        Returns: {
+          anonymous_id: string
+          comment_count: number
+          created_at: string
+          credibility_level: string
+          credibility_score: number
+          inbox_enabled: boolean
+          post_count: number
+          profile_id: string
+          report_count: number
+          reports_count: number
+          self_destruct_days: number | null
+          updated_at: string
+          user_id: string
+        }[]
+      }
+      admin_remove_admin_user: {
+        Args: {
+          p_target_user_id: string
+        }
+        Returns: string
+      }
+      admin_send_inbox_message: {
+        Args: {
+          p_content: string
+          p_recipient_user_id: string
+          p_related_post_id?: string | null
+          p_sender_label?: string | null
+          p_subject: string
+        }
+        Returns: Database["public"]["Tables"]["inbox_messages"]["Row"]
+      }
+      admin_set_post_report_status: {
+        Args: {
+          p_report_id: string
+          p_status: string
+        }
+        Returns: {
+          id: string
+          status: string
+        }[]
+      }
+      admin_set_post_status: {
+        Args: {
+          p_post_id: string
+          p_status: string
+        }
+        Returns: {
+          id: string
+          status: string
+        }[]
+      }
+      admin_upsert_admin_user: {
+        Args: {
+          p_role: string
+          p_target_user_id: string
+        }
+        Returns: Database["public"]["Tables"]["admin_users"]["Row"]
+      }
       create_comment_and_increment: {
         Args: {
           p_content: string
@@ -636,6 +823,14 @@ export type Database = {
           upvote_count: number
           user_id: string | null
           viewer_reaction: string | null
+        }[]
+      }
+      get_my_admin_access: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          is_admin: boolean
+          role: string | null
+          user_id: string | null
         }[]
       }
       set_comment_reaction_state: {

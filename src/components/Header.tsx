@@ -1,4 +1,4 @@
-import { Shield, Eye, Map, Inbox, User, LogIn } from 'lucide-react';
+import { Shield, Eye, Map, Inbox, User, LogIn, ShieldCheck } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { SmartAlerts } from './SmartAlerts';
@@ -12,7 +12,10 @@ const navItems = [
 
 export function Header() {
   const location = useLocation();
-  const { user, loading } = useAuth();
+  const { user, loading, isAdmin } = useAuth();
+  const desktopNavItems = user && isAdmin
+    ? [{ href: '/admin', label: 'Admin', icon: ShieldCheck }]
+    : navItems;
 
   return (
     <header className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -30,7 +33,7 @@ export function Header() {
 
         {/* Desktop nav — hidden on mobile since BottomNav handles it */}
         <nav className="hidden md:flex items-center gap-1">
-          {navItems.map((item) => {
+          {desktopNavItems.map((item) => {
             const isActive = location.pathname === item.href;
             const Icon = item.icon;
             return (
@@ -56,9 +59,9 @@ export function Header() {
           {!loading && (
             <div className="hidden md:flex">
               {user ? (
-                <Link to="/profile">
+                <Link to={isAdmin ? "/admin" : "/profile"}>
                   <Button variant="ghost" size="icon" className="h-9 w-9 flex items-center justify-center">
-                    <User className="h-5 w-5" />
+                    {isAdmin ? <ShieldCheck className="h-5 w-5" /> : <User className="h-5 w-5" />}
                   </Button>
                 </Link>
               ) : (

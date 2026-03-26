@@ -11,7 +11,11 @@ const navItems = [
 
 export function BottomNav() {
   const location = useLocation();
-  const { user } = useAuth();
+  const { user, isAdmin } = useAuth();
+
+  if (isAdmin) {
+    return null;
+  }
 
   // Profile / Sign In link
   const profileItem = {
