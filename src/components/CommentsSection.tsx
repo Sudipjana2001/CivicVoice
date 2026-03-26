@@ -515,12 +515,12 @@ export function CommentsSection({
     const isSubmittingReply = submittingReplyToCommentId === comment.id;
     const replyCount = getReplyCount(comment);
     const isThreadExpanded = expandedThreadIds[comment.id] ?? false;
-    const avatarSize = depth === 0 ? 'h-10 w-10' : 'h-8 w-8';
-    const threadIndent = depth === 0 ? '' : 'ml-4 pl-4 border-l border-border/40';
+    const avatarSize = depth === 0 ? 'h-9 w-9 sm:h-10 sm:w-10' : 'h-8 w-8 sm:h-9 sm:w-9';
+    const threadIndent = depth === 0 ? '' : 'ml-3 pl-3 border-l border-border/40 sm:ml-4 sm:pl-4';
 
     return (
       <div key={comment.id} className={threadIndent}>
-        <div className="flex items-start gap-3">
+        <div className="flex items-start gap-2.5 sm:gap-3">
           <Avatar className={`${avatarSize} shrink-0 ring-1 ring-border/40`}>
             <AvatarFallback className={`text-sm font-semibold ${getAvatarTone(comment.anonymous_id)}`}>
               {getAvatarFallback(comment.anonymous_id)}
@@ -595,7 +595,7 @@ export function CommentsSection({
               </div>
             ) : (
               <>
-                <p className="mt-1 text-[15px] leading-6 text-foreground whitespace-pre-wrap break-words">
+                <p className="mt-1 text-sm leading-6 text-foreground whitespace-pre-wrap break-words sm:text-[15px] sm:leading-7">
                   {comment.content}
                 </p>
 
@@ -605,7 +605,7 @@ export function CommentsSection({
                     size="sm"
                     onClick={() => handleReactionClick(comment, 'upvote')}
                     disabled={isReactionPending || isDeleting || (Boolean(user?.id) && comment.user_id === user.id)}
-                    className={`h-8 rounded-full px-2 text-muted-foreground hover:bg-muted/60 ${comment.viewer_reaction === 'upvote' ? 'text-foreground' : ''}`}
+                    className={`h-8 rounded-full px-2 text-muted-foreground hover:bg-muted/60 sm:px-2.5 ${comment.viewer_reaction === 'upvote' ? 'text-foreground' : ''}`}
                   >
                     {isReactionPending && comment.viewer_reaction === 'upvote' ? (
                       <Loader2 className="h-4 w-4 animate-spin" />
@@ -619,7 +619,7 @@ export function CommentsSection({
                     size="sm"
                     onClick={() => handleReactionClick(comment, 'downvote')}
                     disabled={isReactionPending || isDeleting || (Boolean(user?.id) && comment.user_id === user.id)}
-                    className={`h-8 rounded-full px-2 text-muted-foreground hover:bg-muted/60 ${comment.viewer_reaction === 'downvote' ? 'text-foreground' : ''}`}
+                    className={`h-8 rounded-full px-2 text-muted-foreground hover:bg-muted/60 sm:px-2.5 ${comment.viewer_reaction === 'downvote' ? 'text-foreground' : ''}`}
                   >
                     {isReactionPending && comment.viewer_reaction === 'downvote' ? (
                       <Loader2 className="h-4 w-4 animate-spin" />
@@ -631,7 +631,7 @@ export function CommentsSection({
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="h-8 rounded-full px-3 font-medium text-muted-foreground hover:bg-muted/60 hover:text-foreground"
+                    className="h-8 rounded-full px-2.5 font-medium text-muted-foreground hover:bg-muted/60 hover:text-foreground sm:px-3"
                     onClick={() => {
                       setEditingCommentId(null);
                       setEditContent('');
@@ -652,15 +652,15 @@ export function CommentsSection({
                 </div>
 
                 {isReplying && (
-                  <div className="mt-4 flex items-start gap-3">
-                    <Avatar className="mt-1 h-9 w-9 shrink-0 ring-1 ring-border/40">
+                  <div className="mt-4 flex items-start gap-2.5 sm:gap-3">
+                    <Avatar className="mt-1 h-8 w-8 shrink-0 ring-1 ring-border/40 sm:h-9 sm:w-9">
                       <AvatarFallback className={`text-sm font-semibold ${getAvatarTone(user?.id ?? 'reply-user')}`}>
                         {user?.email?.[0]?.toUpperCase() ?? 'U'}
                       </AvatarFallback>
                     </Avatar>
                     <div className="min-w-0 flex-1">
                       <div className="border-b border-border/70 pb-2">
-                        <p className="mb-2 text-sm text-muted-foreground">
+                        <p className="mb-2 text-xs text-muted-foreground sm:text-sm">
                           Replying to <span className="font-medium text-foreground">@{comment.anonymous_id}</span>
                         </p>
                         <Textarea
@@ -673,14 +673,14 @@ export function CommentsSection({
                           placeholder={`Write a reply to ${comment.anonymous_id}...`}
                           rows={1}
                           autoFocus
-                          className="min-h-[44px] max-h-[220px] resize-none overflow-y-auto rounded-none border-0 bg-transparent px-0 py-1 text-[15px] leading-7 shadow-none focus-visible:ring-0 focus-visible:ring-offset-0"
+                          className="min-h-[44px] max-h-[220px] resize-none overflow-y-auto rounded-none border-0 bg-transparent px-0 py-1 text-sm leading-6 shadow-none focus-visible:ring-0 focus-visible:ring-offset-0 sm:text-[15px] sm:leading-7"
                         />
                       </div>
-                      <div className="mt-3 flex justify-end gap-3">
+                      <div className="mt-3 flex flex-wrap justify-end gap-2 sm:gap-3">
                         <Button
                           variant="ghost"
                           size="sm"
-                          className="rounded-full px-4"
+                          className="rounded-full px-3 sm:px-4"
                           onClick={() => {
                             setReplyingToCommentId(null);
                             setReplyContent('');
@@ -688,7 +688,7 @@ export function CommentsSection({
                         >
                           Cancel
                         </Button>
-                        <Button size="sm" className="rounded-full px-5" onClick={() => handleReplySubmit(comment)} disabled={!replyContent.trim() || isSubmittingReply}>
+                        <Button size="sm" className="rounded-full px-4 sm:px-5" onClick={() => handleReplySubmit(comment)} disabled={!replyContent.trim() || isSubmittingReply}>
                           {isSubmittingReply ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : null}
                           Reply
                         </Button>
@@ -729,10 +729,10 @@ export function CommentsSection({
   return (
     <div className={`flex flex-col bg-background ${isFullPage ? 'h-auto' : 'h-full'}`}>
       {showHeader && (
-        <div className="flex items-center justify-between border-b border-border/50 px-5 py-4">
+        <div className="flex items-center justify-between border-b border-border/50 px-4 py-3.5 sm:px-5 sm:py-4">
           <div className="flex items-end gap-2">
-            <h3 className="text-[2rem] font-bold leading-none text-foreground">Comments</h3>
-            <span className="pb-0.5 text-lg font-medium text-muted-foreground">{commentCount}</span>
+            <h3 className="text-[1.65rem] font-bold leading-none text-foreground sm:text-[2rem]">Comments</h3>
+            <span className="pb-0.5 text-base font-medium text-muted-foreground sm:text-lg">{commentCount}</span>
           </div>
           <div className="flex items-center gap-1">
             <Button
@@ -754,7 +754,7 @@ export function CommentsSection({
       )}
 
       <ScrollArea className={isFullPage ? 'h-auto' : 'flex-1 min-h-0'}>
-        <div className="px-4 py-5 sm:px-5 sm:py-6">
+        <div className="px-3 py-4 sm:px-5 sm:py-6">
           {showInitialSkeleton ? (
             <div className="space-y-6">
               {Array.from({ length: 4 }).map((_, idx) => (
@@ -774,7 +774,7 @@ export function CommentsSection({
               <p className="text-sm text-muted-foreground">No comments yet. Be the first to comment.</p>
             </div>
           ) : (
-            <div className="space-y-6">
+            <div className="space-y-5 sm:space-y-6">
               {orderedComments.map((comment) => renderComment(comment))}
             </div>
           )}
@@ -796,41 +796,41 @@ export function CommentsSection({
         </div>
       </ScrollArea>
 
-      <div className="border-t border-border/50 bg-background/95 px-4 py-3 backdrop-blur sm:px-5">
+      <div className="border-t border-border/50 bg-background/95 px-3 py-3 backdrop-blur sm:px-5">
         {user ? (
-          <div className="flex items-start gap-3">
-            <Avatar className="mt-1 h-10 w-10 shrink-0 ring-1 ring-border/40">
+          <div className="flex items-start gap-2.5 sm:gap-3">
+            <Avatar className="mt-1 h-9 w-9 shrink-0 ring-1 ring-border/40 sm:h-10 sm:w-10">
               <AvatarFallback className={`text-sm font-semibold ${getAvatarTone(user.id)}`}>
                 {user.email?.[0]?.toUpperCase() ?? 'U'}
               </AvatarFallback>
             </Avatar>
             <div className="min-w-0 flex-1">
               <div className="border-b border-border/70 transition-colors focus-within:border-foreground/40">
-              <Textarea
-                ref={mainCommentTextareaRef}
-                value={newComment}
-                onChange={(e) => {
-                  setNewComment(e.target.value);
-                  autoResizeTextarea(e.currentTarget);
-                }}
-                onFocus={() => setIsMainComposerExpanded(true)}
-                placeholder="Add a comment..."
-                rows={1}
-                className="min-h-[44px] max-h-[220px] resize-none overflow-y-auto rounded-none border-0 bg-transparent px-0 py-1 text-[15px] leading-7 shadow-none focus-visible:ring-0 focus-visible:ring-offset-0"
-                onKeyDown={(e) => {
-                  if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
-                    e.preventDefault();
-                    handleSubmit();
-                  }
-                }}
-              />
+                <Textarea
+                  ref={mainCommentTextareaRef}
+                  value={newComment}
+                  onChange={(e) => {
+                    setNewComment(e.target.value);
+                    autoResizeTextarea(e.currentTarget);
+                  }}
+                  onFocus={() => setIsMainComposerExpanded(true)}
+                  placeholder="Add a comment..."
+                  rows={1}
+                  className="min-h-[44px] max-h-[220px] resize-none overflow-y-auto rounded-none border-0 bg-transparent px-0 py-1 text-sm leading-6 shadow-none focus-visible:ring-0 focus-visible:ring-offset-0 sm:text-[15px] sm:leading-7"
+                  onKeyDown={(e) => {
+                    if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+                      e.preventDefault();
+                      handleSubmit();
+                    }
+                  }}
+                />
               </div>
               {(isMainComposerExpanded || Boolean(newComment.trim())) && (
-                <div className="mt-3 flex justify-end gap-3">
+                <div className="mt-3 flex flex-wrap justify-end gap-2 sm:gap-3">
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="rounded-full px-4"
+                    className="rounded-full px-3 sm:px-4"
                     onClick={() => {
                       setNewComment('');
                       setIsMainComposerExpanded(false);
@@ -842,7 +842,7 @@ export function CommentsSection({
                     size="sm"
                     onClick={handleSubmit}
                     disabled={!newComment.trim() || isSubmitting}
-                    className="rounded-full px-5"
+                    className="rounded-full px-4 sm:px-5"
                   >
                     {isSubmitting ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : null}
                     Comment

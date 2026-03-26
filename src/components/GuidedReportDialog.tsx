@@ -302,7 +302,7 @@ export function GuidedReportDialog({ onPostCreated }: GuidedReportDialogProps) {
               </p>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor="date">Date (Optional)</Label>
                 <Input
@@ -551,7 +551,7 @@ export function GuidedReportDialog({ onPostCreated }: GuidedReportDialogProps) {
           Report Incident
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-lg bg-card border-border max-h-[90vh] overflow-y-auto">
+      <DialogContent className="w-[calc(100vw-1rem)] rounded-2xl bg-card border-border max-h-[90vh] overflow-y-auto sm:max-w-lg">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-foreground">
             <Shield className="h-5 w-5 shield-icon" />
@@ -564,9 +564,9 @@ export function GuidedReportDialog({ onPostCreated }: GuidedReportDialogProps) {
 
         {/* Progress */}
         <div className="space-y-2">
-          <div className="flex justify-between text-xs text-muted-foreground">
+          <div className="flex justify-between gap-3 text-xs text-muted-foreground">
             <span>Step {stepIndex + 1} of {STEPS.length}</span>
-            <span>{STEPS[stepIndex].label}</span>
+            <span className="truncate text-right">{STEPS[stepIndex].label}</span>
           </div>
           <Progress value={progress} className="h-1" />
           <div className="flex justify-between">
@@ -600,19 +600,19 @@ export function GuidedReportDialog({ onPostCreated }: GuidedReportDialogProps) {
         </div>
 
         {/* Navigation */}
-        <div className="flex justify-between pt-2 border-t border-border">
+        <div className="flex flex-col-reverse gap-2 pt-2 border-t border-border sm:flex-row sm:items-center sm:justify-between">
           <Button
             variant="ghost"
             onClick={prevStep}
             disabled={stepIndex === 0}
-            className="gap-1"
+            className="gap-1 w-full sm:w-auto"
           >
             <ChevronLeft className="h-4 w-4" />
             Back
           </Button>
 
           {currentStep === 'review' ? (
-            <Button onClick={handleSubmit} disabled={isSubmitting} className="bg-primary hover:bg-primary/90 gap-2">
+            <Button onClick={handleSubmit} disabled={isSubmitting} className="bg-primary hover:bg-primary/90 gap-2 w-full sm:w-auto">
               <Shield className="h-4 w-4" />
               {isSubmitting ? 'Posting...' : 'Post'}
             </Button>
@@ -620,7 +620,7 @@ export function GuidedReportDialog({ onPostCreated }: GuidedReportDialogProps) {
             <Button
               onClick={nextStep}
               disabled={!canProceed()}
-              className="gap-1"
+              className="gap-1 w-full sm:w-auto"
             >
               Next
               <ChevronRight className="h-4 w-4" />
