@@ -303,7 +303,7 @@ export function CommentsSection({
     return { upvoteCount, downvoteCount };
   };
 
-  const getReplyCount = (comment: CommentRow) => countCommentTree(comment) - 1;
+  const getReplyCount = (comment: CommentRow) => comment.replies.length;
 
   const toggleThread = (commentId: string) => {
     setExpandedThreadIds((prev) => ({
