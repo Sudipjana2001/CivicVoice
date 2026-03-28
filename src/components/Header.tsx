@@ -1,16 +1,21 @@
-import { Shield, Eye, Map, Inbox, User, LogIn, ShieldCheck } from 'lucide-react';
+import { Shield, Eye, Map, Users, UserPlus, User, LogIn, ShieldCheck, MessageSquare, Home, Menu } from 'lucide-react';
+import { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
 import { SmartAlerts } from './SmartAlerts';
+import { GlobalSearch } from './GlobalSearch';
 import { useAuth } from '@/hooks/useAuth';
 
 const navItems = [
-  { href: '/', label: 'Feed' },
+  { href: '/', label: 'Community Feed', icon: Home },
+  { href: '/communities', label: 'Communities', icon: Users },
+  { href: '/conversations', label: 'Conversations', icon: MessageSquare },
   { href: '/heatmap', label: 'Heatmap', icon: Map },
-  { href: '/inbox', label: 'Inbox', icon: Inbox },
 ];
 
 export function Header() {
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const location = useLocation();
   const { user, loading, isAdmin } = useAuth();
   const desktopNavItems = user && isAdmin
@@ -54,6 +59,13 @@ export function Header() {
         </nav>
 
         <div className="flex items-center gap-1 sm:gap-2">
+          <GlobalSearch />
+          <Link to="/heatmap" className="md:hidden">
+            <Button variant="ghost" size="icon" className="h-9 w-9 text-muted-foreground hover:text-foreground">
+              <Map className="h-5 w-5" />
+              <span className="sr-only">Heatmap</span>
+            </Button>
+          </Link>
           <SmartAlerts />
           
           {!loading && (

@@ -3,7 +3,7 @@ import { Shield, AlertTriangle } from 'lucide-react';
 export function Footer() {
   return (
     <footer className="border-t border-border/40 bg-card/50 mt-auto">
-      <div className="container py-8">
+      <div className="container pt-8 pb-24 md:pb-8">
         <div className="flex flex-col md:flex-row items-center justify-between gap-6">
           <div className="flex items-center gap-3">
             <Shield className="h-6 w-6 text-primary" />

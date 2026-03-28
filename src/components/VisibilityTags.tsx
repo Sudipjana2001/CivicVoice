@@ -20,7 +20,7 @@ const tagConfig: Record<VisibilityTag, {
   shared_watchdog: {
     icon: Eye,
     label: 'Shared with Watchdog',
-    description: 'This report has been shared with a watchdog group for monitoring. No enforcement action implied.',
+    description: 'This report has been shared with a watchdog community for monitoring. No enforcement action implied.',
   },
   media_attention: {
     icon: Radio,

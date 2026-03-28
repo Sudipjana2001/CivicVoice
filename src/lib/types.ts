@@ -102,7 +102,7 @@ export const CONFIDENCE_LEVELS: { id: ConfidenceLevel; label: string; descriptio
 
 export const VISIBILITY_TAGS: { id: VisibilityTag; label: string }[] = [
   { id: 'shared_ngo', label: 'Shared with NGO' },
-  { id: 'shared_watchdog', label: 'Shared with Watchdog Group' },
+  { id: 'shared_watchdog', label: 'Shared with Watchdog Community' },
   { id: 'media_attention', label: 'Media Attention' },
 ];
 

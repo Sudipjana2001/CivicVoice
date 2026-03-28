@@ -16,6 +16,9 @@ import Auth from "./pages/Auth";
 import Profile from "./pages/Profile";
 import CommentsPage from "./pages/CommentsPage";
 import Admin from "./pages/Admin";
+import ConversationsPage from "./pages/ConversationsPage";
+import CommunitiesPage from "./pages/CommunitiesPage";
+import CommunityDetailPage from "./pages/CommunityDetailPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient({
@@ -110,6 +113,9 @@ const AppRoutes = () => {
         <Route path="/profile" element={<UserOnlyRoute><Profile /></UserOnlyRoute>} />
         <Route path="/admin" element={<AdminOnlyRoute><Admin /></AdminOnlyRoute>} />
         <Route path="/comments/:postId" element={<UserOnlyRoute><CommentsPage /></UserOnlyRoute>} />
+        <Route path="/conversations" element={<UserOnlyRoute><ConversationsPage /></UserOnlyRoute>} />
+        <Route path="/communities" element={<UserOnlyRoute><CommunitiesPage /></UserOnlyRoute>} />
+        <Route path="/communities/:slug" element={<UserOnlyRoute><CommunityDetailPage /></UserOnlyRoute>} />
         {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
         <Route path="*" element={<NotFound />} />
       </Routes>
