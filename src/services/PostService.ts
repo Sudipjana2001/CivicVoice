@@ -97,6 +97,48 @@ export class PostService {
     };
   }
 
+  async fetchTopLevelCommentCounts(postIds: string[]): Promise<Map<string, number>> {
+    const uniquePostIds = Array.from(new Set(postIds.filter(Boolean)));
+
+    if (uniquePostIds.length === 0) {
+      return new Map();
+    }
+
+    const { data, error } = await supabase
+      .from('comments')
+      .select('post_id')
+      .in('post_id', uniquePostIds)
+      .is('parent_comment_id', null);
+
+    if (error) throw error;
+
+    const countMap = new Map(uniquePostIds.map((postId) => [postId, 0]));
+    for (const row of data || []) {
+      const postId = row.post_id;
+      if (!postId) continue;
+      countMap.set(postId, (countMap.get(postId) ?? 0) + 1);
+    }
+
+    return countMap;
+  }
+
+  async fetchTopLevelCommentCount(postId: string): Promise<number> {
+    const counts = await this.fetchTopLevelCommentCounts([postId]);
+    return counts.get(postId) ?? 0;
+  }
+
+  private async withTopLevelCommentCounts<T extends Post & { userId?: string }>(posts: T[]): Promise<T[]> {
+    if (posts.length === 0) {
+      return posts;
+    }
+
+    const countMap = await this.fetchTopLevelCommentCounts(posts.map((post) => post.id));
+    return posts.map((post) => ({
+      ...post,
+      commentCount: countMap.get(post.id) ?? 0,
+    }));
+  }
+
   /** Fetch all posts, ordered by most recent first. */
   async fetchAll(): Promise<Post[]> {
     const { data, error } = await supabase
@@ -105,7 +147,7 @@ export class PostService {
       .order('created_at', { ascending: false });
 
     if (error) throw error;
-    return (data || []).map(this.mapRowToPost);
+    return this.withTopLevelCommentCounts((data || []).map(this.mapRowToPost));
   }
 
   /** Fetch a page of posts for infinite scrolling. */
@@ -118,7 +160,7 @@ export class PostService {
 
     if (error) throw error;
 
-    const posts = (data || []).map(this.mapRowToPost);
+    const posts = await this.withTopLevelCommentCounts((data || []).map(this.mapRowToPost));
     return {
       posts,
       hasMore: posts.length === limit,
@@ -134,7 +176,14 @@ export class PostService {
       .maybeSingle();
 
     if (error) throw error;
-    return data ? this.mapRowToPost(data) : null;
+    if (!data) {
+      return null;
+    }
+
+    return {
+      ...this.mapRowToPost(data),
+      commentCount: await this.fetchTopLevelCommentCount(data.id),
+    };
   }
 
   /** Fetch all posts by a specific user ID. */
@@ -146,7 +195,7 @@ export class PostService {
       .order('created_at', { ascending: false });
 
     if (error) throw error;
-    return (data || []).map(this.mapRowToPost);
+    return this.withTopLevelCommentCounts((data || []).map(this.mapRowToPost));
   }
 
   /** Create a new post. Returns the created post. */

@@ -1,7 +1,9 @@
 import { supabase } from '@/integrations/supabase/client';
+import { PostService } from '@/services/PostService';
 import type { CivicFeedItem, CivicVoice, FeedSortOption, VoiceVisibility } from '@/lib/civicSocial';
 
 const socialClient = supabase as any;
+const postService = PostService.getInstance();
 
 export class CivicFeedService {
   private static instance: CivicFeedService;
@@ -125,6 +127,8 @@ export class CivicFeedService {
       status: row.status,
     }));
 
+    const issueCommentCounts = await postService.fetchTopLevelCommentCounts(issueItems.map((item) => item.id));
+
     const voiceItems: CivicFeedItem[] = (voicesResponse.data || []).map((row: any) => ({
       id: row.id,
       itemType: row.kind,
@@ -140,7 +144,10 @@ export class CivicFeedService {
       status: row.status,
     }));
 
-    return [...issueItems, ...voiceItems]
+    return [...issueItems.map((item) => ({
+      ...item,
+      commentCount: issueCommentCounts.get(item.id) ?? 0,
+    })), ...voiceItems]
       .sort((left, right) => {
         if (sortBy === 'most_supported') {
           return right.supportCount - left.supportCount;

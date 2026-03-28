@@ -58,7 +58,7 @@ function mergeRealtimePost(currentPost: CachedPost, row: Record<string, unknown>
     createdAt: typeof row.created_at === 'string' ? new Date(row.created_at) : currentPost.createdAt,
     credibleVotes: typeof row.credible_votes === 'number' ? row.credible_votes : currentPost.credibleVotes,
     suspiciousVotes: typeof row.suspicious_votes === 'number' ? row.suspicious_votes : currentPost.suspiciousVotes,
-    commentCount: typeof row.comment_count === 'number' ? row.comment_count : currentPost.commentCount,
+    commentCount: currentPost.commentCount,
     reportCount: typeof row.report_count === 'number' ? row.report_count : currentPost.reportCount,
     status: typeof row.status === 'string' ? row.status : currentPost.status,
     selfDestructAt: row.self_destruct_at === null
@@ -179,6 +179,37 @@ export default function Index() {
     setSelectedPostId(null);
   }, []);
 
+  const syncCachedPostCommentCount = useCallback((postId: string, commentCount: number) => {
+    queryClient.setQueryData(['posts'], (current: InfinitePostsCache | undefined) => {
+      if (!current?.pages) {
+        return current;
+      }
+
+      return {
+        ...current,
+        pages: current.pages.map((page) => ({
+          ...page,
+          posts: page.posts.map((post) => (
+            post.id === postId
+              ? { ...post, commentCount }
+              : post
+          )),
+        })),
+      };
+    });
+
+    queryClient.setQueryData(['post', postId], (current: CachedPost | null | undefined) => {
+      if (!current) {
+        return current;
+      }
+
+      return {
+        ...current,
+        commentCount,
+      };
+    });
+  }, [queryClient]);
+
   // Real-time subscription for new posts
   useEffect(() => {
     const channel = supabase
@@ -218,13 +249,21 @@ export default function Index() {
 
           return mergeRealtimePost(current, row);
         });
+
+        void postService.fetchTopLevelCommentCount(postId)
+          .then((commentCount) => {
+            syncCachedPostCommentCount(postId, commentCount);
+          })
+          .catch((error) => {
+            console.error('Error refreshing top-level comment count:', error);
+          });
       })
       .subscribe();
 
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [queryClient]);
+  }, [queryClient, syncCachedPostCommentCount]);
 
   useEffect(() => {
     let cancelled = false;

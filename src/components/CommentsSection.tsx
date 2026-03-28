@@ -400,13 +400,11 @@ export function CommentsSection({
     const wasTopLevelComment = comments.some((comment) => comment.id === commentId);
     try {
       await commentService.delete(commentId);
-      setComments((prev) => {
-        const { nextComments } = removeCommentFromTree(prev, commentId);
-        if (wasTopLevelComment) {
-          applyCommentCount((current) => current - 1);
-        }
-        return nextComments;
-      });
+      const { nextComments } = removeCommentFromTree(comments, commentId);
+      setComments(nextComments);
+      if (wasTopLevelComment) {
+        applyCommentCount((current) => current - 1);
+      }
       toast.success('Comment deleted');
     } catch (error) {
       console.error('Error deleting comment:', error);
