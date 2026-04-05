@@ -8,6 +8,7 @@ import { CategoryBadge } from '@/components/CategoryBadge';
 import { SeverityBadge } from '@/components/SeverityBadge';
 import { IncidentStatusBadge } from '@/components/IncidentStatusBadge';
 import { LegalDisclaimer } from '@/components/LegalDisclaimer';
+import { PostAssistantButton } from '@/components/PostAssistantButton';
 import { ReportPostButton } from '@/components/ReportPostButton';
 import { ProgressiveMediaPreview } from '@/components/ProgressiveMediaPreview';
 import { PostService } from '@/services/PostService';
@@ -393,6 +394,10 @@ export default function CommentsPage() {
                 </div>
 
                 <div className="flex items-center gap-1">
+                  <PostAssistantButton
+                    post={post}
+                    className="px-2 h-8 text-muted-foreground hover:text-foreground cv-interactive"
+                  />
                   <Button
                     variant="ghost"
                     size="sm"

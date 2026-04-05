@@ -130,6 +130,56 @@ export type Database = {
         }
         Relationships: []
       }
+      assistant_runs: {
+        Row: {
+          assistant_payload: Json
+          created_at: string
+          district: string | null
+          id: string
+          input_hash: string
+          model: string
+          post_id: string
+          post_snapshot_hash: string
+          prompt_version: number
+          requester_user_id: string
+          state_code: string
+        }
+        Insert: {
+          assistant_payload: Json
+          created_at?: string
+          district?: string | null
+          id?: string
+          input_hash: string
+          model: string
+          post_id: string
+          post_snapshot_hash: string
+          prompt_version?: number
+          requester_user_id: string
+          state_code: string
+        }
+        Update: {
+          assistant_payload?: Json
+          created_at?: string
+          district?: string | null
+          id?: string
+          input_hash?: string
+          model?: string
+          post_id?: string
+          post_snapshot_hash?: string
+          prompt_version?: number
+          requester_user_id?: string
+          state_code?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "assistant_runs_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: false
+            referencedRelation: "posts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       admin_users: {
         Row: {
           created_at: string
@@ -339,6 +389,81 @@ export type Database = {
           related_post_id?: string | null
           read?: boolean
           created_at?: string
+        }
+        Relationships: []
+      }
+      india_assistant_laws: {
+        Row: {
+          act_name: string
+          active: boolean
+          caution_note: string
+          created_at: string
+          id: string
+          source_url: string
+          summary: string
+          topic_key: string
+        }
+        Insert: {
+          act_name: string
+          active?: boolean
+          caution_note: string
+          created_at?: string
+          id?: string
+          source_url: string
+          summary: string
+          topic_key: string
+        }
+        Update: {
+          act_name?: string
+          active?: boolean
+          caution_note?: string
+          created_at?: string
+          id?: string
+          source_url?: string
+          summary?: string
+          topic_key?: string
+        }
+        Relationships: []
+      }
+      india_assistant_resources: {
+        Row: {
+          active: boolean
+          applicability_note: string
+          authority_name: string
+          created_at: string
+          id: string
+          official_source_url: string
+          phone: string | null
+          priority: number
+          route_type: string
+          topic_key: string
+          url: string | null
+        }
+        Insert: {
+          active?: boolean
+          applicability_note: string
+          authority_name: string
+          created_at?: string
+          id?: string
+          official_source_url: string
+          phone?: string | null
+          priority?: number
+          route_type: string
+          topic_key: string
+          url?: string | null
+        }
+        Update: {
+          active?: boolean
+          applicability_note?: string
+          authority_name?: string
+          created_at?: string
+          id?: string
+          official_source_url?: string
+          phone?: string | null
+          priority?: number
+          route_type?: string
+          topic_key?: string
+          url?: string | null
         }
         Relationships: []
       }

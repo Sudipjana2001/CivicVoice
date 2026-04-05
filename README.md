@@ -51,3 +51,15 @@ src/           # Application source code
 public/        # Static assets
 supabase/      # Supabase configuration and migrations
 ```
+
+## India Post Assistant
+
+The post assistant is implemented as a Supabase Edge Function named `post-assistant`.
+
+Setup notes:
+
+- Set `OPENAI_API_KEY` as a Supabase Edge Function secret.
+- Optionally set `OPENAI_MODEL` if you want to override the default `gpt-5.4-mini`.
+- Apply the latest migration before using the feature so the India grounding tables and assistant cache exist.
+
+The assistant uses `fetch` server-side and does not use `axios`.

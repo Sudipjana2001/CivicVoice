@@ -40,6 +40,7 @@ import { CredibilityBadge } from './CredibilityBadge';
 import { LegalDisclaimer } from './LegalDisclaimer';
 import { RelatedIncidents } from './RelatedIncidents';
 import { ReportPostButton } from './ReportPostButton';
+import { PostAssistantButton } from './PostAssistantButton';
 import { ProgressiveMediaPreview } from './ProgressiveMediaPreview';
 
 import { useIsMobile } from '@/hooks/use-mobile';
@@ -525,6 +526,10 @@ export function EnhancedPostCard({ post, onCommentsClick, isCommentsOpen, onPost
                 <MessageCircle className="h-4 w-4" />
                 <span className="text-xs ml-1">{post.commentCount}</span>
               </Button>
+              <PostAssistantButton
+                post={post}
+                className="px-2 sm:px-3 text-muted-foreground hover:text-foreground cv-interactive"
+              />
               <Button 
                 variant="ghost" 
                 size="sm" 
