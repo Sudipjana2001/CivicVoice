@@ -1,5 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
-import type { IndiaAssistantRequest, IndiaAssistantResponse } from '@/lib/postAssistant';
+import type { ChatRequest, IndiaAssistantRequest, IndiaAssistantResponse } from '@/lib/postAssistant';
 
 export class PostAssistantService {
   private static instance: PostAssistantService;
@@ -62,5 +62,69 @@ export class PostAssistantService {
     }
 
     return data;
+  }
+
+  async *chatStream(request: ChatRequest): AsyncGenerator<string, void, unknown> {
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+
+    if (!session?.access_token) {
+      throw new Error('Please sign in again to use the assistant.');
+    }
+
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+    if (!supabaseUrl) {
+      throw new Error('Supabase URL not configured.');
+    }
+
+    const response = await fetch(`${supabaseUrl}/functions/v1/post-assistant-chat`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${session.access_token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(request),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Failed to send message: ${response.status} ${errorText}`);
+    }
+
+    if (!response.body) {
+      throw new Error('No response body from assistant stream.');
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder('utf-8');
+    let buffer = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop() || '';
+
+      for (const line of lines) {
+        if (line.trim().startsWith('data: ')) {
+          const dataStr = line.replace('data: ', '').trim();
+          if (dataStr === '[DONE]') {
+            return;
+          }
+          try {
+            const data = JSON.parse(dataStr);
+            const content = data?.choices?.[0]?.delta?.content;
+            if (content) {
+              yield content;
+            }
+          } catch (e) {
+            // Ignore incomplete chunks that slipped through
+          }
+        }
+      }
+    }
   }
 }

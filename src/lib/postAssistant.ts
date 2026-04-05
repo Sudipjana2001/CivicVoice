@@ -35,6 +35,18 @@ export interface IndiaAssistantRequest {
   district?: string;
 }
 
+export interface ChatMessage {
+  role: 'user' | 'assistant';
+  content: string;
+}
+
+export interface ChatRequest {
+  postId: string;
+  stateCode: string;
+  district?: string;
+  messages: ChatMessage[];
+}
+
 export const POST_ASSISTANT_STATE_STORAGE_KEY = 'civicvoice.post-assistant.state-code';
 
 export const INDIA_STATE_OPTIONS = [

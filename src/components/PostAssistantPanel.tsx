@@ -13,6 +13,7 @@ import {
   ShieldAlert,
   ShieldCheck,
   X,
+  Send,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -28,6 +29,7 @@ import {
   parseLocationFromPost,
   POST_ASSISTANT_STATE_STORAGE_KEY,
   type IndiaAssistantResponse,
+  type ChatMessage,
 } from '@/lib/postAssistant';
 import { PostAssistantService } from '@/services/PostAssistantService';
 import { toast } from 'sonner';
@@ -50,7 +52,7 @@ function getUrgencyBadgeVariant(urgency: IndiaAssistantResponse['urgency']): 'de
 
 /* ─────────────────────────── Result sections ─────────────────────────── */
 
-function AssistantResult({ result }: { result: IndiaAssistantResponse }) {
+function AssistantResult({ result, onQuestionClick }: { result: IndiaAssistantResponse; onQuestionClick: (q: string) => void }) {
   return (
     <div className="space-y-5">
       <div className="rounded-xl border border-border/60 bg-muted/20 p-4">
@@ -155,11 +157,17 @@ function AssistantResult({ result }: { result: IndiaAssistantResponse }) {
           <Bot className="h-4 w-4 text-primary" />
           <h4 className="text-sm font-semibold text-foreground">Questions to ask next</h4>
         </div>
-        <ul className="space-y-2">
+        <div className="flex flex-col gap-2">
           {result.questionsToAskLawyerOrAuthority.map((question) => (
-            <li key={question} className="rounded-xl border border-border/60 px-4 py-3 text-sm text-foreground/90">{question}</li>
+            <button
+              key={question}
+              onClick={() => onQuestionClick(question)}
+              className="rounded-xl border border-border/60 px-4 py-3 text-sm text-left text-foreground/90 hover:bg-muted/50 transition-colors"
+            >
+              {question}
+            </button>
           ))}
-        </ul>
+        </div>
       </section>
 
       <div className="rounded-xl border border-primary/20 bg-primary/5 p-4">
@@ -189,10 +197,16 @@ interface PanelBodyProps {
   result: IndiaAssistantResponse | null;
   isPending: boolean;
   configOpen: boolean;
+  messages: ChatMessage[];
+  chatInput: string;
+  isChatting: boolean;
   onConfigOpenChange: (v: boolean) => void;
   onStateCodeChange: (v: string) => void;
   onDistrictChange: (v: string) => void;
   onAnalyze: () => void;
+  onQuestionClick: (q: string) => void;
+  setChatInput: (v: string) => void;
+  onSendChat: () => void;
 }
 
 function PanelBody({
@@ -202,22 +216,39 @@ function PanelBody({
   result,
   isPending,
   configOpen,
+  messages,
+  chatInput,
+  isChatting,
   onConfigOpenChange,
   onStateCodeChange,
   onDistrictChange,
   onAnalyze,
+  onQuestionClick,
+  setChatInput,
+  onSendChat,
 }: PanelBodyProps) {
   const stateLabel = useMemo(() => getIndiaStateLabel(stateCode), [stateCode]);
   const hasResult = Boolean(result);
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  // Auto-scroll chat to bottom
+  useEffect(() => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollTo({
+        top: scrollRef.current.scrollHeight,
+        behavior: 'smooth',
+      });
+    }
+  }, [messages]);
 
   return (
     <>
       {/* Config section — collapses after first analysis */}
       <div
-        className="overflow-hidden transition-all duration-300 ease-in-out shrink-0"
-        style={{ maxHeight: configOpen ? '500px' : '0px', opacity: configOpen ? 1 : 0 }}
+        className="overflow-hidden transition-all duration-300 ease-in-out shrink-0 border-b border-border/60"
+        style={{ maxHeight: configOpen ? '500px' : '0px', opacity: configOpen ? 1 : 0, borderBottomWidth: configOpen ? '1px' : '0px' }}
       >
-        <div className="space-y-4 border-b border-border/60 px-5 py-4 sm:px-6">
+        <div className="space-y-4 px-5 py-4 sm:px-6">
           {/* Post info pill */}
           <div className="flex items-center gap-2 rounded-lg bg-muted/30 px-3 py-2">
             <Bot className="h-3.5 w-3.5 shrink-0 text-primary" />
@@ -293,11 +324,26 @@ function PanelBody({
       )}
 
       {/* Scrollable results area */}
-      <div className="flex-1 overflow-y-auto px-5 py-5 pb-8 sm:px-6">
+      <div ref={scrollRef} className="flex-1 overflow-y-auto px-5 py-5 pb-8 sm:px-6 flex flex-col">
         {isPending ? (
           <AssistantSkeleton />
         ) : result ? (
-          <AssistantResult result={result} />
+          <div className="flex flex-col gap-6">
+            <AssistantResult result={result} onQuestionClick={onQuestionClick} />
+            
+            {/* Chat Messages */}
+            {messages.length > 0 && (
+              <div className="flex flex-col gap-4 mt-4 pt-4 border-t border-border/60">
+                {messages.map((msg, idx) => (
+                  <div key={idx} className={`flex flex-col max-w-[85%] ${msg.role === 'user' ? 'self-end items-end' : 'self-start items-start'}`}>
+                    <div className={`px-4 py-2 rounded-2xl text-sm whitespace-pre-wrap ${msg.role === 'user' ? 'bg-primary text-primary-foreground rounded-br-sm' : 'bg-muted text-foreground rounded-bl-sm'}`}>
+                      {msg.content}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         ) : (
           <div className="rounded-xl border border-dashed border-border/60 bg-muted/10 p-5 text-sm text-muted-foreground">
             Choose your state and run the assistant to get India-specific legal context, evidence tips, and official reporting routes for this post.
@@ -390,6 +436,12 @@ export function PostAssistantPanel({ post, open, onOpenChange }: PostAssistantPa
   const [result, setResult] = useState<IndiaAssistantResponse | null>(null);
   const [configOpen, setConfigOpen] = useState(true);
 
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [chatInput, setChatInput] = useState('');
+  const [isChatting, setIsChatting] = useState(false);
+
+  const CHAT_STORAGE_KEY = `civicvoice.post-assistant.chat.${post.id}`;
+
   // Seed location from the post whenever it changes
   useEffect(() => {
     const parsed = parseLocationFromPost(post.location);
@@ -405,13 +457,37 @@ export function PostAssistantPanel({ post, open, onOpenChange }: PostAssistantPa
     }
     setResult(null);
     setConfigOpen(true);
-  }, [post.id, post.location]);
+    
+    // Load chat cache if any
+    if (typeof window !== 'undefined') {
+      const storedChat = window.sessionStorage.getItem(CHAT_STORAGE_KEY);
+      if (storedChat) {
+        try {
+          setMessages(JSON.parse(storedChat));
+        } catch (e) {
+          setMessages([]);
+        }
+      } else {
+        setMessages([]);
+      }
+    }
+  }, [post.id, post.location, CHAT_STORAGE_KEY]);
 
   // Persist chosen state
   useEffect(() => {
     if (typeof window === 'undefined' || !stateCode) return;
     window.localStorage.setItem(POST_ASSISTANT_STATE_STORAGE_KEY, stateCode);
   }, [stateCode]);
+
+  // Persist chat to sessionStorage
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (messages.length > 0) {
+      window.sessionStorage.setItem(CHAT_STORAGE_KEY, JSON.stringify(messages));
+    } else {
+      window.sessionStorage.removeItem(CHAT_STORAGE_KEY);
+    }
+  }, [messages, CHAT_STORAGE_KEY]);
 
   const mutation = useMutation({
     mutationFn: () => postAssistantService.analyze({ postId: post.id, stateCode, district }),
@@ -431,6 +507,47 @@ export function PostAssistantPanel({ post, open, onOpenChange }: PostAssistantPa
     mutation.mutate();
   };
 
+  const handleSendChat = async (overrideMsg?: string) => {
+    const text = overrideMsg || chatInput;
+    if (!text.trim() || isChatting) return;
+
+    setChatInput('');
+    setIsChatting(true);
+
+    const updatedMessages: ChatMessage[] = [
+      ...messages,
+      { role: 'user', content: text.trim() }
+    ];
+    setMessages(updatedMessages);
+
+    try {
+      const stream = postAssistantService.chatStream({
+        postId: post.id,
+        stateCode,
+        district,
+        messages: updatedMessages,
+      });
+
+      let assistantReply = '';
+      setMessages([...updatedMessages, { role: 'assistant', content: '' }]);
+
+      for await (const chunk of stream) {
+        assistantReply += chunk;
+        setMessages([
+          ...updatedMessages,
+          { role: 'assistant', content: assistantReply }
+        ]);
+      }
+    } catch (error) {
+      console.error('Chat error:', error);
+      toast.error(error instanceof Error ? error.message : 'Chat failed.');
+      // Revert user message if it failed completely
+      if (messages.length === 0) setMessages([]);
+    } finally {
+      setIsChatting(false);
+    }
+  };
+
   const bodyProps: PanelBodyProps = {
     post,
     stateCode,
@@ -438,10 +555,16 @@ export function PostAssistantPanel({ post, open, onOpenChange }: PostAssistantPa
     result,
     isPending: mutation.isPending,
     configOpen,
+    messages,
+    chatInput,
+    isChatting,
     onConfigOpenChange: setConfigOpen,
     onStateCodeChange: setStateCode,
     onDistrictChange: setDistrict,
     onAnalyze: handleAnalyze,
+    onQuestionClick: (q) => handleSendChat(q),
+    setChatInput,
+    onSendChat: () => handleSendChat()
   };
 
   if (!open) return null;
